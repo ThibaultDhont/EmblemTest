@@ -1,0 +1,10 @@
+{
+  "terrain.plain": "Plain",
+  "terrain.forest": "Forest",
+  "terrain.mountain": "Mountain",
+  "terrain.wall": "Wall",
+  "class.swordsman": "Swordsman",
+  "class.lancer": "Lancer",
+  "class.archer": "Archer",
+  "panel.unit": "{class} · Mov {mov}"
+}
