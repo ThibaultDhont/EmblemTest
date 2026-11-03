@@ -1,5 +1,5 @@
 import type { Command, ComparisonOp, Condition, ScriptEvent, Side, Trigger } from './script.ts';
-import type { GameState } from './types.ts';
+import type { GameState, Pos } from './types.ts';
 
 export const NARRATION = 'narration'; // locuteur sans portrait ni nom
 const MAX_PER_SIDE = 3;
@@ -24,12 +24,21 @@ interface Frame {
 
 // Curseur de lecture d'un événement : la présentation demande les répliques une à une.
 export interface DialogueRunner {
+  eventId: string;
   frames: Frame[];
   cast: Portrait[];
 }
 
 export function startDialogue(event: ScriptEvent): DialogueRunner {
-  return { frames: [{ commands: event.commands, index: 0 }], cast: [] };
+  return { eventId: event.id, frames: [{ commands: event.commands, index: 0 }], cast: [] };
+}
+
+// Passe tout le reste de l'événement sans l'afficher : les commandes (drapeaux, portraits) sont
+// appliquées pour que la suite de la partie soit la même. Renvoie les répliques sautées.
+export function skipRest(runner: DialogueRunner, state: GameState): Line[] {
+  const skipped: Line[] = [];
+  for (let line = nextLine(runner, state); line !== null; line = nextLine(runner, state)) skipped.push(line);
+  return skipped;
 }
 
 // Applique les commandes jusqu'à la prochaine réplique, qu'elle renvoie. Null en fin d'événement.
@@ -108,6 +117,35 @@ function show(runner: DialogueRunner, who: string, side: Side): void {
   const sameSide = others.filter((portrait) => portrait.side === side);
   const dropped = sameSide.length >= MAX_PER_SIDE ? sameSide[0] : undefined;
   runner.cast = [...others.filter((portrait) => portrait !== dropped), { who, side }];
+}
+
+// Boutons affichés pendant un dialogue, sur la première ligne de tuiles : en tuiles, pour que la
+// souris et le toucher les visent comme le reste du jeu.
+export type DialogueButton = 'auto' | 'history' | 'skip';
+
+export const DIALOGUE_BUTTONS: Record<DialogueButton, { x: number; width: number }> = {
+  auto: { x: 14, width: 3 },
+  history: { x: 17, width: 4 },
+  skip: { x: 21, width: 3 },
+};
+
+export function dialogueButtonAt(pos: Pos): DialogueButton | undefined {
+  if (pos.y !== 0) return undefined;
+  const names: DialogueButton[] = ['auto', 'history', 'skip'];
+  return names.find((name) => pos.x >= DIALOGUE_BUTTONS[name].x && pos.x < DIALOGUE_BUTTONS[name].x + DIALOGUE_BUTTONS[name].width);
+}
+
+// Fenêtre de l'historique (en tuiles) et ses deux flèches de défilement, dans ses coins droits.
+export const HISTORY_BOX = { x: 1, y: 1, width: 22, height: 14 };
+export type HistoryButton = 'up' | 'down';
+export const HISTORY_BUTTONS: Record<HistoryButton, Pos> = {
+  up: { x: HISTORY_BOX.x + HISTORY_BOX.width - 1, y: HISTORY_BOX.y },
+  down: { x: HISTORY_BOX.x + HISTORY_BOX.width - 1, y: HISTORY_BOX.y + HISTORY_BOX.height - 1 },
+};
+
+export function historyButtonAt(pos: Pos): HistoryButton | undefined {
+  const names: HistoryButton[] = ['up', 'down'];
+  return names.find((name) => pos.x === HISTORY_BUTTONS[name].x && pos.y === HISTORY_BUTTONS[name].y);
 }
 
 // Événements à jouer pour ce déclencheur, qui n'ont pas encore été joués. Ils sont marqués comme joués.

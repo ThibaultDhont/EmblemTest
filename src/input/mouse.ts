@@ -29,4 +29,12 @@ export function attachMouse(canvas: HTMLCanvasElement, dispatch: ActionHandler):
     }
   });
   canvas.addEventListener('contextmenu', (event) => event.preventDefault());
+  canvas.addEventListener(
+    'wheel',
+    (event) => {
+      event.preventDefault();
+      dispatch({ type: 'scroll', lines: Math.sign(event.deltaY) * 3 });
+    },
+    { passive: false },
+  );
 }

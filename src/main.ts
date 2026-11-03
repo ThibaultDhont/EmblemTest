@@ -1,7 +1,15 @@
 import { planEnemyAction } from './core/ai.ts';
 import { applyEvent, resolveCombat } from './core/combat.ts';
 import type { CombatEvent } from './core/combat.ts';
-import { NARRATION, nextLine, startDialogue, takeEvents } from './core/dialogue.ts';
+import {
+  NARRATION,
+  dialogueButtonAt,
+  historyButtonAt,
+  nextLine,
+  skipRest,
+  startDialogue,
+  takeEvents,
+} from './core/dialogue.ts';
 import type { DialogueRunner, Line } from './core/dialogue.ts';
 import type { ScriptEvent, Trigger } from './core/script.ts';
 import { cancel, confirm, createUiState, finishAction, finishMove, resetUi, setCursor } from './core/selection.ts';
@@ -20,13 +28,26 @@ const MOVE_STEP_MS = 90;
 const COMBAT_STEP_MS = 600;
 const ENEMY_PAUSE_MS = 350;
 const TEXT_STEP_MS = 25;
+const AUTO_DELAY_MS = 3000; // mode Auto : délai entre la fin de l'affichage d'une réplique et la suivante
+const SKIP_CONFIRM_MS = 3000; // « Passer » : temps laissé pour confirmer
+const HISTORY_LIMIT = 300;
+const HISTORY_PAGE = 9; // lignes parcourues par un clic sur une flèche de l'historique
 
-// Dialogues en cours : les événements restant à jouer et le texte en train de s'écrire.
+// Dialogue en cours : les événements restant à jouer, le texte en train de s'écrire et les minuteries associées.
 interface ActiveDialogue {
   queue: ScriptEvent[];
   runner: DialogueRunner | null;
-  timer: number | undefined;
+  timer: number | undefined; // écriture progressive
+  autoTimer: number | undefined; // passage automatique à la réplique suivante
+  skipTimer: number | undefined; // fin de la demande de confirmation de « Passer »
   done: () => void;
+}
+
+// Une réplique déjà vue, gardée pour l'historique (le texte est traduit à l'affichage).
+interface LogEntry {
+  eventId: string;
+  speaker: string;
+  key: string;
 }
 
 const language = detectLanguage();
@@ -38,11 +59,13 @@ if (canvas === null) throw new Error('Canvas #game introuvable');
 
 const state = createChapter1();
 const ui = createUiState();
-const fx: Effects = { flashId: null, popup: null, dialogue: null, showOutcome: false };
+const fx: Effects = { flashId: null, popup: null, dialogue: null, history: null, showOutcome: false };
 const renderer = createRenderer(canvas);
 let enemyPhaseRunning = false;
 let endHandled = false;
 let dialogue: ActiveDialogue | null = null;
+let autoMode = false; // gardé pendant la session, pas entre deux chargements de la page
+const log: LogEntry[] = [];
 const pendingDeaths: string[] = []; // unités tombées dont le dialogue de mort n'a pas encore été joué
 
 const draw = (): void => renderer.draw(state, ui, fx);
@@ -100,8 +123,36 @@ function playMove(unit: Unit, path: Pos[], done: () => void): void {
   step();
 }
 
+function remember(eventId: string, line: Line): void {
+  log.push({ eventId, speaker: line.speaker, key: line.key });
+  if (log.length > HISTORY_LIMIT) log.shift();
+}
+
+function clearTimers(active: ActiveDialogue): void {
+  window.clearTimeout(active.timer);
+  window.clearTimeout(active.autoTimer);
+  window.clearTimeout(active.skipTimer);
+  active.timer = undefined;
+  active.autoTimer = undefined;
+  active.skipTimer = undefined;
+}
+
+// En mode Auto, la réplique entièrement affichée passe à la suivante après un délai. Rien tant que
+// l'historique est ouvert.
+function scheduleAuto(active: ActiveDialogue): void {
+  window.clearTimeout(active.autoTimer);
+  active.autoTimer = undefined;
+  const view = fx.dialogue;
+  if (!autoMode || fx.history !== null || view === null || view.revealed < view.text.length) return;
+  active.autoTimer = window.setTimeout(() => {
+    active.autoTimer = undefined;
+    if (dialogue === active) stepDialogue(active);
+  }, AUTO_DELAY_MS);
+}
+
 // Affiche une réplique, dont le texte s'écrit lettre par lettre.
-function startLine(active: ActiveDialogue, line: Line): void {
+function startLine(active: ActiveDialogue, line: Line, eventId: string): void {
+  remember(eventId, line);
   const text = storyText(line.key);
   const view = {
     speaker: line.speaker,
@@ -109,12 +160,19 @@ function startLine(active: ActiveDialogue, line: Line): void {
     text,
     revealed: 0,
     cast: line.cast,
+    auto: autoMode,
+    skipPending: false,
   };
   fx.dialogue = view;
   const type = (): void => {
     view.revealed += 1;
     draw();
-    active.timer = view.revealed < text.length ? window.setTimeout(type, TEXT_STEP_MS) : undefined;
+    if (view.revealed < text.length) {
+      active.timer = window.setTimeout(type, TEXT_STEP_MS);
+    } else {
+      active.timer = undefined;
+      scheduleAuto(active);
+    }
   };
   active.timer = window.setTimeout(type, TEXT_STEP_MS);
   draw();
@@ -122,6 +180,7 @@ function startLine(active: ActiveDialogue, line: Line): void {
 
 function endDialogue(active: ActiveDialogue): void {
   fx.dialogue = null;
+  fx.history = null;
   dialogue = null;
   draw();
   active.done();
@@ -129,6 +188,7 @@ function endDialogue(active: ActiveDialogue): void {
 
 // Passe à la réplique suivante, d'un événement ou du suivant ; termine si plus rien ne reste.
 function stepDialogue(active: ActiveDialogue): void {
+  clearTimers(active);
   for (;;) {
     if (active.runner === null) {
       const event = active.queue.shift();
@@ -143,22 +203,120 @@ function stepDialogue(active: ActiveDialogue): void {
       active.runner = null;
       continue;
     }
-    startLine(active, line);
+    startLine(active, line, active.runner.eventId);
     return;
   }
 }
 
 // Un clic affiche d'abord toute la réplique, puis passe à la suivante.
-function advanceDialogue(): void {
+function advanceDialogue(active: ActiveDialogue): void {
   const view = fx.dialogue;
-  if (dialogue === null || view === null) return;
+  if (view === null) return;
   if (view.revealed < view.text.length) {
-    window.clearTimeout(dialogue.timer);
-    dialogue.timer = undefined;
+    window.clearTimeout(active.timer);
+    active.timer = undefined;
     view.revealed = view.text.length;
     draw();
+    scheduleAuto(active);
   } else {
-    stepDialogue(dialogue);
+    stepDialogue(active);
+  }
+}
+
+function cancelSkip(active: ActiveDialogue): void {
+  window.clearTimeout(active.skipTimer);
+  active.skipTimer = undefined;
+  if (fx.dialogue !== null) fx.dialogue.skipPending = false;
+}
+
+// Premier clic : demande confirmation. Second clic : saute le reste de l'événement en cours (ses drapeaux
+// sont appliqués, ses répliques entrent dans l'historique) et passe au suivant s'il y en a un.
+function askSkip(active: ActiveDialogue): void {
+  const view = fx.dialogue;
+  if (view === null) return;
+  if (!view.skipPending) {
+    view.skipPending = true;
+    active.skipTimer = window.setTimeout(() => {
+      active.skipTimer = undefined;
+      view.skipPending = false;
+      draw();
+    }, SKIP_CONFIRM_MS);
+    draw();
+    return;
+  }
+
+  const runner = active.runner;
+  if (runner !== null) {
+    for (const line of skipRest(runner, state)) remember(runner.eventId, line);
+    active.runner = null;
+  }
+  stepDialogue(active);
+}
+
+function toggleAuto(active: ActiveDialogue): void {
+  autoMode = !autoMode;
+  if (fx.dialogue !== null) fx.dialogue.auto = autoMode;
+  scheduleAuto(active);
+  draw();
+}
+
+function openHistory(active: ActiveDialogue): void {
+  window.clearTimeout(active.autoTimer);
+  active.autoTimer = undefined;
+  fx.history = {
+    entries: log.map((entry) => ({
+      eventId: entry.eventId,
+      name: entry.speaker === NARRATION ? '' : storyText(`char.${entry.speaker}`),
+      text: storyText(entry.key),
+    })),
+    offset: 0,
+  };
+  draw();
+}
+
+function closeHistory(active: ActiveDialogue): void {
+  fx.history = null;
+  scheduleAuto(active);
+  draw();
+}
+
+// Pendant un dialogue, la carte est inaccessible : seuls le texte, ses trois boutons et l'historique réagissent.
+function handleDialogueAction(active: ActiveDialogue, action: Action): void {
+  const history = fx.history;
+  if (history !== null) {
+    if (action.type === 'setCursor') setCursor(state, ui, action.pos);
+    else if (action.type === 'scroll') history.offset -= action.lines;
+    else if (action.type === 'cancel') closeHistory(active);
+    else {
+      const arrow = historyButtonAt(ui.cursor);
+      if (arrow === 'up') history.offset += HISTORY_PAGE;
+      else if (arrow === 'down') history.offset -= HISTORY_PAGE;
+      else closeHistory(active);
+    }
+    draw();
+    return;
+  }
+
+  switch (action.type) {
+    case 'setCursor':
+      setCursor(state, ui, action.pos);
+      draw();
+      break;
+    case 'confirm': {
+      const button = dialogueButtonAt(ui.cursor);
+      if (button !== 'skip') cancelSkip(active);
+      if (button === 'auto') toggleAuto(active);
+      else if (button === 'history') openHistory(active);
+      else if (button === 'skip') askSkip(active);
+      else advanceDialogue(active);
+      break;
+    }
+    case 'cancel':
+      cancelSkip(active);
+      openHistory(active);
+      break;
+    case 'scroll':
+      break;
   }
 }
 
@@ -167,7 +325,7 @@ function playDialogues(events: ScriptEvent[], done: () => void): void {
     done();
     return;
   }
-  dialogue = { queue: [...events], runner: null, timer: undefined, done };
+  dialogue = { queue: [...events], runner: null, timer: undefined, autoTimer: undefined, skipTimer: undefined, done };
   stepDialogue(dialogue);
 }
 
@@ -275,7 +433,7 @@ function play(playback: Playback | null): void {
 // Tour par tour : on ne redessine qu'après une action ou une étape de lecture.
 function dispatch(action: Action): void {
   if (dialogue !== null) {
-    if (action.type === 'confirm') advanceDialogue(); // pendant un dialogue, seul le clic de validation compte
+    handleDialogueAction(dialogue, action);
     return;
   }
   switch (action.type) {
@@ -292,6 +450,8 @@ function dispatch(action: Action): void {
     case 'cancel':
       cancel(state, ui);
       break;
+    case 'scroll':
+      return;
   }
   draw();
   advance();

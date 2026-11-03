@@ -3,8 +3,8 @@ import { tilesInRange } from '../core/combat.ts';
 import { posOf } from '../core/grid.ts';
 import type { UiState } from '../core/selection.ts';
 import type { ClassId, GameState, Pos, TerrainId, Team, Unit } from '../core/types.ts';
-import { drawDialogue } from './dialogue.ts';
-import type { DialogueView } from './dialogue.ts';
+import { drawDialogue, drawHistory } from './dialogue.ts';
+import type { DialogueView, HistoryView } from './dialogue.ts';
 import { drawForecast, drawHud, drawInfoPanel, drawMenu, drawOutcome } from './panels.ts';
 
 // Effets ponctuels : lecture d'un combat, dialogue en cours, écran de fin.
@@ -12,6 +12,7 @@ export interface Effects {
   flashId: string | null; // unité qui clignote en blanc
   popup: { pos: Pos; text: string; color: string } | null; // dégâts affichés au-dessus d'une case
   dialogue: DialogueView | null; // réplique en cours : elle remplace les panneaux de jeu
+  history: HistoryView | null; // fenêtre d'historique, ouverte par-dessus un dialogue
   showOutcome: boolean; // l'écran de victoire ou de défaite apparaît après les dialogues de fin
 }
 
@@ -65,7 +66,8 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
       drawPopup(ctx, fx);
 
       if (fx.dialogue !== null) {
-        drawDialogue(ctx, fx.dialogue);
+        drawDialogue(ctx, fx.dialogue, ui.cursor);
+        if (fx.history !== null) drawHistory(ctx, fx.history);
         return;
       }
       drawHud(ctx, state);

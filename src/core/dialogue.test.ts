@@ -1,6 +1,16 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { holds, nextLine, startDialogue, takeEvents } from './dialogue.ts';
+import {
+  DIALOGUE_BUTTONS,
+  HISTORY_BOX,
+  dialogueButtonAt,
+  historyButtonAt,
+  holds,
+  nextLine,
+  skipRest,
+  startDialogue,
+  takeEvents,
+} from './dialogue.ts';
 import { stateFromRows } from './grid.ts';
 import { parseScript } from './script.ts';
 import type { Condition } from './script.ts';
@@ -183,6 +193,56 @@ test('les blocs @si imbriqués se lisent de l\'intérieur vers l\'extérieur', (
   assert.deepEqual(keysOf(script, withFlags()), ['x.fin']);
   assert.deepEqual(keysOf(script, withFlags('a')), ['x.a-sans-b', 'x.a', 'x.fin']);
   assert.deepEqual(keysOf(script, withFlags('a', 'b')), ['x.a-et-b', 'x.a', 'x.fin']);
+});
+
+test("le curseur de lecture connaît l'événement qu'il joue", () => {
+  assert.equal(start('intro').runner.eventId, 'intro');
+});
+
+test('skipRest applique les commandes restantes et renvoie les répliques sautées', () => {
+  const { runner, state } = start(
+    'a',
+    `@event a quand chapitre.debut
+       anna: x.1
+       @drapeau vu
+       anna: x.2
+       @si drapeau(vu)
+         anna: x.3
+       @fin`,
+  );
+  assert.equal(nextLine(runner, state)?.key, 'x.1'); // déjà affichée
+  assert.deepEqual(skipRest(runner, state).map((line) => line.key), ['x.2', 'x.3']);
+  assert.deepEqual(state.flags, ['vu']);
+  assert.equal(nextLine(runner, state), null);
+  assert.deepEqual(skipRest(runner, state), []);
+});
+
+test('dialogueButtonAt repère les trois boutons de la première ligne', () => {
+  for (const name of ['auto', 'history', 'skip'] as const) {
+    const { x, width } = DIALOGUE_BUTTONS[name];
+    assert.equal(dialogueButtonAt({ x, y: 0 }), name);
+    assert.equal(dialogueButtonAt({ x: x + width - 1, y: 0 }), name);
+  }
+  assert.equal(dialogueButtonAt({ x: DIALOGUE_BUTTONS.auto.x - 1, y: 0 }), undefined);
+  assert.equal(dialogueButtonAt({ x: DIALOGUE_BUTTONS.auto.x, y: 1 }), undefined);
+});
+
+test("les boutons ne se chevauchent pas et tiennent dans l'écran", () => {
+  const spans = Object.values(DIALOGUE_BUTTONS).sort((a, b) => a.x - b.x);
+  spans.forEach((span, index) => {
+    const next = spans[index + 1];
+    if (next !== undefined) assert.ok(span.x + span.width <= next.x);
+  });
+  const last = spans.at(-1);
+  assert.ok(last !== undefined && last.x + last.width <= 24);
+});
+
+test("historyButtonAt repère les deux flèches, dans la fenêtre de l'historique", () => {
+  const right = HISTORY_BOX.x + HISTORY_BOX.width - 1;
+  assert.equal(historyButtonAt({ x: right, y: HISTORY_BOX.y }), 'up');
+  assert.equal(historyButtonAt({ x: right, y: HISTORY_BOX.y + HISTORY_BOX.height - 1 }), 'down');
+  assert.equal(historyButtonAt({ x: right - 1, y: HISTORY_BOX.y }), undefined);
+  assert.equal(historyButtonAt({ x: right, y: HISTORY_BOX.y + 1 }), undefined);
 });
 
 test('@drapeau et @efface modifient l\'état et sont lus par les @si qui suivent', () => {

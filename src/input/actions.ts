@@ -4,6 +4,7 @@ import type { Pos } from '../core/types.ts';
 export type Action =
   | { type: 'setCursor'; pos: Pos }
   | { type: 'confirm' }
-  | { type: 'cancel' };
+  | { type: 'cancel' }
+  | { type: 'scroll'; lines: number }; // molette : positif vers le bas
 
 export type ActionHandler = (action: Action) => void;
