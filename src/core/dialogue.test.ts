@@ -1,16 +1,20 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import {
+  CHOICE_BOX,
   DIALOGUE_BUTTONS,
   HISTORY_BOX,
+  choiceOptionAt,
+  choose,
   dialogueButtonAt,
   historyButtonAt,
   holds,
-  nextLine,
+  nextStep,
   skipRest,
   startDialogue,
   takeEvents,
 } from './dialogue.ts';
+import type { DialogueRunner } from './dialogue.ts';
 import { stateFromRows } from './grid.ts';
 import { parseScript } from './script.ts';
 import type { Condition } from './script.ts';
@@ -31,6 +35,14 @@ const SCRIPT = `
 `;
 
 const emptyState = () => stateFromRows(['..'], []);
+
+// Prochaine réplique ; la plupart des tests n'ont pas de choix, qui ferait échouer celui-ci.
+function nextLine(runner: DialogueRunner, state: GameState) {
+  const step = nextStep(runner, state);
+  if (step === null) return null;
+  if (step.type === 'choice') assert.fail('un choix était inattendu');
+  return step.line;
+}
 
 function start(id: string, text = SCRIPT, state: GameState = emptyState()) {
   const event = parseScript(text).find((candidate) => candidate.id === id);
@@ -243,6 +255,117 @@ test("historyButtonAt repère les deux flèches, dans la fenêtre de l'historiqu
   assert.equal(historyButtonAt({ x: right, y: HISTORY_BOX.y + HISTORY_BOX.height - 1 }), 'down');
   assert.equal(historyButtonAt({ x: right - 1, y: HISTORY_BOX.y }), undefined);
   assert.equal(historyButtonAt({ x: right, y: HISTORY_BOX.y + 1 }), undefined);
+});
+
+const CHOICE_SCRIPT = `
+  @event a quand chapitre.debut
+    @montre anna gauche
+    anna: x.question
+    @choix
+      @option x.oui
+        @drapeau oui
+        anna: x.reponse-oui
+      @option x.non
+        anna: x.reponse-non
+    @fin
+    anna: x.apres`;
+
+// Ce que la lecture rend jusqu'à la fin ou jusqu'à un choix : « choix » pour un choix, sinon la clé de la réplique.
+function drain(runner: DialogueRunner, state: GameState): string[] {
+  const seen: string[] = [];
+  for (let step = nextStep(runner, state); step !== null; step = nextStep(runner, state)) {
+    seen.push(step.type === 'line' ? step.line.key : 'choix');
+    if (step.type === 'choice') break;
+  }
+  return seen;
+}
+
+test('un @choix devient une étape, redemandée tant que le joueur n\'a pas répondu', () => {
+  const { runner, state } = start('a', CHOICE_SCRIPT);
+  assert.equal(nextStep(runner, state)?.type, 'line'); // la question
+  const step = nextStep(runner, state);
+  assert.deepEqual(step, {
+    type: 'choice',
+    choice: { options: ['x.oui', 'x.non'], cast: [{ who: 'anna', side: 'gauche' }] },
+  });
+  assert.deepEqual(nextStep(runner, state), step);
+  assert.deepEqual(nextStep(runner, state), step);
+});
+
+test('choose continue dans l\'option choisie, puis après le bloc', () => {
+  const { runner, state } = start('a', CHOICE_SCRIPT);
+  assert.deepEqual(drain(runner, state), ['x.question', 'choix']);
+  assert.equal(choose(runner, 0), 'x.oui');
+  assert.deepEqual(drain(runner, state), ['x.reponse-oui', 'x.apres']);
+  assert.deepEqual(state.flags, ['oui']);
+});
+
+test('l\'autre option ne pose pas le drapeau de la première', () => {
+  const { runner, state } = start('a', CHOICE_SCRIPT);
+  drain(runner, state);
+  assert.equal(choose(runner, 1), 'x.non');
+  assert.deepEqual(drain(runner, state), ['x.reponse-non', 'x.apres']);
+  assert.deepEqual(state.flags, []);
+});
+
+test('choose refuse un indice invalide ou l\'absence de choix, sans rien changer', () => {
+  const { runner, state } = start('a', CHOICE_SCRIPT);
+  assert.equal(choose(runner, 0), undefined); // pas encore de choix
+  drain(runner, state);
+  assert.equal(choose(runner, 2), undefined);
+  assert.equal(choose(runner, -1), undefined);
+  assert.equal(nextStep(runner, state)?.type, 'choice'); // toujours en attente
+  assert.deepEqual(state.flags, []);
+});
+
+test('un choix peut contenir un @si et un autre @choix', () => {
+  const { runner, state } = start(
+    'a',
+    `@event a quand chapitre.debut
+       @choix
+         @option x.a
+           @si drapeau(ok)
+             anna: x.a-ok
+           @sinon
+             anna: x.a-ko
+           @fin
+           @choix
+             @option x.b
+               anna: x.b-reponse
+           @fin
+       @fin`,
+  );
+  assert.deepEqual(drain(runner, state), ['choix']);
+  choose(runner, 0);
+  assert.deepEqual(drain(runner, state), ['x.a-ko', 'choix']);
+  assert.equal(choose(runner, 0), 'x.b');
+  assert.deepEqual(drain(runner, state), ['x.b-reponse']);
+});
+
+test('skipRest s\'arrête au choix et ne choisit jamais à la place du joueur', () => {
+  const { runner, state } = start('a', CHOICE_SCRIPT);
+  assert.deepEqual(skipRest(runner, state).map((line) => line.key), ['x.question']);
+  assert.deepEqual(state.flags, []);
+  assert.equal(nextStep(runner, state)?.type, 'choice');
+
+  choose(runner, 0);
+  assert.deepEqual(skipRest(runner, state).map((line) => line.key), ['x.reponse-oui', 'x.apres']);
+  assert.deepEqual(state.flags, ['oui']);
+});
+
+test('choiceOptionAt repère les options, de deux tuiles de haut chacune', () => {
+  const { x, y, width, rowHeight } = CHOICE_BOX;
+  assert.equal(choiceOptionAt({ x, y }, 2), 0);
+  assert.equal(choiceOptionAt({ x: x + width - 1, y: y + rowHeight - 1 }, 2), 0);
+  assert.equal(choiceOptionAt({ x, y: y + rowHeight }, 2), 1);
+  assert.equal(choiceOptionAt({ x, y: y + 2 * rowHeight }, 2), undefined);
+  assert.equal(choiceOptionAt({ x: x - 1, y }, 2), undefined);
+  assert.equal(choiceOptionAt({ x: x + width, y }, 2), undefined);
+  assert.equal(choiceOptionAt({ x, y: y - 1 }, 2), undefined);
+});
+
+test('quatre options tiennent dans l\'écran', () => {
+  assert.ok(CHOICE_BOX.y + 4 * CHOICE_BOX.rowHeight <= 16);
 });
 
 test('@drapeau et @efface modifient l\'état et sont lus par les @si qui suivent', () => {

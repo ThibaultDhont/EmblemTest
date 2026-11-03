@@ -1,7 +1,8 @@
-import type { Command, ComparisonOp, Condition, ScriptEvent, Side, Trigger } from './script.ts';
+import type { ChoiceCommand, Command, ComparisonOp, Condition, ScriptEvent, Side, Trigger } from './script.ts';
 import type { GameState, Pos } from './types.ts';
 
 export const NARRATION = 'narration'; // locuteur sans portrait ni nom
+export const CHOICE = 'choix'; // « locuteur » d'un choix du joueur, dans l'historique
 const MAX_PER_SIDE = 3;
 
 // Un portrait à l'écran. Sur chaque côté, ils s'alignent dans l'ordre d'arrivée.
@@ -16,34 +17,38 @@ export interface Line {
   cast: Portrait[]; // portraits visibles pendant cette réplique
 }
 
-// Une liste de commandes en cours de lecture : l'événement lui-même, puis chaque branche @si entrée.
+// Les réponses proposées au joueur, par clé de traduction de leur libellé.
+export interface Choice {
+  options: string[];
+  cast: Portrait[];
+}
+
+export type Step = { type: 'line'; line: Line } | { type: 'choice'; choice: Choice };
+
+// Une liste de commandes en cours de lecture : l'événement lui-même, puis chaque branche @si ou @option entrée.
 interface Frame {
   commands: Command[];
   index: number;
 }
 
-// Curseur de lecture d'un événement : la présentation demande les répliques une à une.
+// Curseur de lecture d'un événement : la présentation demande les étapes une à une.
 export interface DialogueRunner {
   eventId: string;
   frames: Frame[];
   cast: Portrait[];
+  pending: ChoiceCommand | null; // choix posé au joueur, tant qu'il n'a pas répondu
 }
 
 export function startDialogue(event: ScriptEvent): DialogueRunner {
-  return { eventId: event.id, frames: [{ commands: event.commands, index: 0 }], cast: [] };
+  return { eventId: event.id, frames: [{ commands: event.commands, index: 0 }], cast: [], pending: null };
 }
 
-// Passe tout le reste de l'événement sans l'afficher : les commandes (drapeaux, portraits) sont
-// appliquées pour que la suite de la partie soit la même. Renvoie les répliques sautées.
-export function skipRest(runner: DialogueRunner, state: GameState): Line[] {
-  const skipped: Line[] = [];
-  for (let line = nextLine(runner, state); line !== null; line = nextLine(runner, state)) skipped.push(line);
-  return skipped;
-}
+// Applique les commandes jusqu'à la prochaine étape : une réplique, ou un choix à faire. Null en fin d'événement.
+// Un choix en attente est redemandé tant que `choose` n'a pas été appelé. Les conditions sont évaluées au
+// moment où l'on atteint le @si, avec l'état de partie d'alors.
+export function nextStep(runner: DialogueRunner, state: GameState): Step | null {
+  if (runner.pending !== null) return { type: 'choice', choice: choiceOf(runner, runner.pending) };
 
-// Applique les commandes jusqu'à la prochaine réplique, qu'elle renvoie. Null en fin d'événement.
-// Les conditions sont évaluées au moment où l'on atteint le @si, avec l'état de partie d'alors.
-export function nextLine(runner: DialogueRunner, state: GameState): Line | null {
   for (let frame = runner.frames.at(-1); frame !== undefined; frame = runner.frames.at(-1)) {
     const command = frame.commands[frame.index];
     if (command === undefined) {
@@ -53,7 +58,7 @@ export function nextLine(runner: DialogueRunner, state: GameState): Line | null 
     frame.index += 1;
     switch (command.op) {
       case 'say':
-        return { speaker: command.speaker, key: command.key, cast: [...runner.cast] };
+        return { type: 'line', line: { speaker: command.speaker, key: command.key, cast: [...runner.cast] } };
       case 'show':
         show(runner, command.who, command.side);
         break;
@@ -66,9 +71,35 @@ export function nextLine(runner: DialogueRunner, state: GameState): Line | null 
       case 'if':
         runner.frames.push({ commands: holds(command.condition, state) ? command.then : command.otherwise, index: 0 });
         break;
+      case 'choice':
+        runner.pending = command;
+        return { type: 'choice', choice: choiceOf(runner, command) };
     }
   }
   return null;
+}
+
+function choiceOf(runner: DialogueRunner, command: ChoiceCommand): Choice {
+  return { options: command.options.map((option) => option.key), cast: [...runner.cast] };
+}
+
+// Enregistre la réponse du joueur : la lecture continue dans l'option choisie. Renvoie la clé de son
+// libellé, ou undefined (rien ne change) s'il n'y a pas de choix en attente ou si l'indice est invalide.
+export function choose(runner: DialogueRunner, index: number): string | undefined {
+  const option = runner.pending?.options[index];
+  if (option === undefined) return undefined;
+  runner.pending = null;
+  runner.frames.push({ commands: option.commands, index: 0 });
+  return option.key;
+}
+
+// Passe le reste de l'événement sans l'afficher, jusqu'au prochain choix : les commandes (drapeaux,
+// portraits) sont appliquées pour que la suite de la partie soit la même, mais on ne choisit jamais à la
+// place du joueur. Renvoie les répliques sautées.
+export function skipRest(runner: DialogueRunner, state: GameState): Line[] {
+  const skipped: Line[] = [];
+  for (let step = nextStep(runner, state); step?.type === 'line'; step = nextStep(runner, state)) skipped.push(step.line);
+  return skipped;
 }
 
 export function holds(condition: Condition, state: GameState): boolean {
@@ -133,6 +164,16 @@ export function dialogueButtonAt(pos: Pos): DialogueButton | undefined {
   if (pos.y !== 0) return undefined;
   const names: DialogueButton[] = ['auto', 'history', 'skip'];
   return names.find((name) => pos.x >= DIALOGUE_BUTTONS[name].x && pos.x < DIALOGUE_BUTTONS[name].x + DIALOGUE_BUTTONS[name].width);
+}
+
+// Panneau de choix (en tuiles) : chaque option occupe deux tuiles de haut, faciles à viser au toucher.
+export const CHOICE_BOX = { x: 3, y: 6, width: 18, rowHeight: 2 };
+
+// Indice de l'option sous la tuile `pos`, parmi `count` options, ou undefined.
+export function choiceOptionAt(pos: Pos, count: number): number | undefined {
+  const inside = pos.x >= CHOICE_BOX.x && pos.x < CHOICE_BOX.x + CHOICE_BOX.width && pos.y >= CHOICE_BOX.y;
+  const row = Math.floor((pos.y - CHOICE_BOX.y) / CHOICE_BOX.rowHeight);
+  return inside && row < count ? row : undefined;
 }
 
 // Fenêtre de l'historique (en tuiles) et ses deux flèches de défilement, dans ses coins droits.

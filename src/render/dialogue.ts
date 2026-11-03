@@ -1,5 +1,12 @@
 import { SCREEN_HEIGHT, SCREEN_WIDTH, TILE_SIZE } from '../config.ts';
-import { DIALOGUE_BUTTONS, HISTORY_BOX, HISTORY_BUTTONS, dialogueButtonAt } from '../core/dialogue.ts';
+import {
+  CHOICE_BOX,
+  DIALOGUE_BUTTONS,
+  HISTORY_BOX,
+  HISTORY_BUTTONS,
+  choiceOptionAt,
+  dialogueButtonAt,
+} from '../core/dialogue.ts';
 import type { Portrait } from '../core/dialogue.ts';
 import type { Pos } from '../core/types.ts';
 import { CHARACTERS } from '../data/characters.ts';
@@ -15,6 +22,11 @@ export interface DialogueView {
   cast: Portrait[]; // portraits à l'écran, par côté dans l'ordre d'arrivée
   auto: boolean; // mode Auto activé
   skipPending: boolean; // « Passer » attend sa confirmation
+}
+
+// Les réponses proposées au joueur, libellés déjà traduits.
+export interface ChoiceView {
+  options: string[];
 }
 
 // Une réplique déjà vue, traduite, pour la fenêtre d'historique.
@@ -137,6 +149,30 @@ export function drawDialogue(ctx: CanvasRenderingContext2D, view: DialogueView, 
   }
 
   drawButtons(ctx, view, cursor);
+}
+
+// Panneau de choix : le jeu s'assombrit (les boutons du dialogue sont redessinés par-dessus, pour rester
+// lisibles et utilisables) et chaque option est un bouton de deux tuiles de haut.
+export function drawChoice(ctx: CanvasRenderingContext2D, view: ChoiceView, dialogue: DialogueView, cursor: Pos): void {
+  ctx.fillStyle = 'rgba(10, 14, 30, 0.6)';
+  ctx.fillRect(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT);
+  drawButtons(ctx, dialogue, cursor);
+
+  const hovered = choiceOptionAt(cursor, view.options.length);
+  const x = CHOICE_BOX.x * TILE_SIZE;
+  const width = CHOICE_BOX.width * TILE_SIZE;
+  const height = CHOICE_BOX.rowHeight * TILE_SIZE;
+  setText(ctx);
+  view.options.forEach((option, index) => {
+    const y = (CHOICE_BOX.y + index * CHOICE_BOX.rowHeight) * TILE_SIZE;
+    drawBox(ctx, x + 2, y + 2, width - 4, height - 4);
+    if (hovered === index) {
+      ctx.fillStyle = '#2d3f8f';
+      ctx.fillRect(x + 2, y + 2, width - 4, height - 4);
+    }
+    ctx.fillStyle = '#ffffff';
+    ctx.fillText(option, x + 12, y + height / 2 - 4);
+  });
 }
 
 function drawArrow(ctx: CanvasRenderingContext2D, tile: Pos, up: boolean): void {

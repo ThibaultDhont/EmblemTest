@@ -12,11 +12,13 @@ const story: Record<string, string> = JSON.parse(
   readFileSync(new URL('../i18n/story.fr.json', import.meta.url), 'utf8'),
 );
 
-// Toutes les commandes d'un événement, branches @si comprises.
+// Toutes les commandes d'un événement, branches @si et options de @choix comprises.
 function flatten(commands: Command[]): Command[] {
-  return commands.flatMap((command) =>
-    command.op === 'if' ? [command, ...flatten(command.then), ...flatten(command.otherwise)] : [command],
-  );
+  return commands.flatMap((command) => {
+    if (command.op === 'if') return [command, ...flatten(command.then), ...flatten(command.otherwise)];
+    if (command.op === 'choice') return [command, ...command.options.flatMap((option) => flatten(option.commands))];
+    return [command];
+  });
 }
 
 function unitsIn(condition: Condition): string[] {
@@ -38,12 +40,11 @@ function flagsIn(condition: Condition): string[] {
 
 const commands = events.flatMap((event) => flatten(event.commands));
 const conditions = commands.flatMap((command) => (command.op === 'if' ? [command.condition] : []));
+const sayKeys = commands.flatMap((command) => (command.op === 'say' ? [command.key] : []));
+const optionKeys = commands.flatMap((command) => (command.op === 'choice' ? command.options.map((option) => option.key) : []));
 
 test('toutes les clés des dialogues du chapitre 1 existent dans le fichier de textes', () => {
-  const missing = commands
-    .flatMap((command) => (command.op === 'say' ? [command.key] : []))
-    .filter((key) => story[key] === undefined);
-  assert.deepEqual(missing, []);
+  assert.deepEqual([...sayKeys, ...optionKeys].filter((key) => story[key] === undefined), []);
 });
 
 test('tous les personnages des dialogues sont définis, avec leur nom', () => {
@@ -60,7 +61,12 @@ test('tous les personnages des dialogues sont définis, avec leur nom', () => {
 });
 
 test('chaque réplique tient dans la boîte de dialogue (4 lignes)', () => {
-  const tooLong = Object.entries(story).filter(([key, text]) => !key.startsWith('char.') && text.length > 250);
+  const tooLong = sayKeys.filter((key) => (story[key] ?? '').length > 250);
+  assert.deepEqual(tooLong, []);
+});
+
+test("chaque libellé d'option tient sur une ligne du panneau de choix", () => {
+  const tooLong = optionKeys.filter((key) => (story[key] ?? '').length > 50);
   assert.deepEqual(tooLong, []);
 });
 
@@ -73,7 +79,7 @@ test('les unités citées par les déclencheurs et les conditions existent dans 
   assert.deepEqual(cited.filter((id) => !ids.has(id)), []);
 });
 
-test("tout drapeau lu par un @si est posé quelque part dans le script", () => {
+test('tout drapeau lu par un @si est posé quelque part dans le script', () => {
   const set = new Set(commands.flatMap((command) => (command.op === 'flag' && command.value ? [command.name] : [])));
   assert.deepEqual(conditions.flatMap(flagsIn).filter((name) => !set.has(name)), []);
 });

@@ -150,6 +150,66 @@ test('les blocs @si doivent être bien formés', () => {
   );
 });
 
+test('un @choix garde ses options, avec leurs commandes', () => {
+  const [event] = parseScript(
+    inEvent('@choix', '  @option x.oui', '    @drapeau oui', '    anna: x.1', '  @option x.non', '    anna: x.2', '@fin', 'anna: x.3'),
+  );
+  assert.deepEqual(event?.commands, [
+    {
+      op: 'choice',
+      options: [
+        {
+          key: 'x.oui',
+          commands: [
+            { op: 'flag', name: 'oui', value: true },
+            { op: 'say', speaker: 'anna', key: 'x.1' },
+          ],
+        },
+        { key: 'x.non', commands: [{ op: 'say', speaker: 'anna', key: 'x.2' }] },
+      ],
+    },
+    { op: 'say', speaker: 'anna', key: 'x.3' },
+  ]);
+});
+
+test('un @choix peut contenir des @si et d\'autres @choix', () => {
+  const [event] = parseScript(
+    inEvent(
+      '@choix',
+      '  @option x.a',
+      '    @si drapeau(ok)',
+      '      anna: x.1',
+      '    @fin',
+      '    @choix',
+      '      @option x.b',
+      '        anna: x.2',
+      '    @fin',
+      '@fin',
+    ),
+  );
+  const outer = event?.commands[0];
+  assert.equal(outer?.op, 'choice');
+  const commands = outer?.op === 'choice' ? (outer.options[0]?.commands ?? []) : [];
+  assert.deepEqual(
+    commands.map((command) => command.op),
+    ['if', 'choice'],
+  );
+});
+
+test('les @choix mal formés sont refusés', () => {
+  assert.throws(() => parseScript(inEvent('@option x.a')), /Ligne 2 : @option en dehors/);
+  assert.throws(() => parseScript(inEvent('@choix extra', '@fin')), /Ligne 2 : .*@choix/);
+  assert.throws(() => parseScript(inEvent('@choix', '  anna: x.1', '  @option x.a', '@fin')), /Ligne 3 : .*sous une @option/);
+  assert.throws(() => parseScript(inEvent('@choix', '@fin')), /Ligne 2 : .*aucune @option/);
+  assert.throws(() => parseScript(inEvent('@choix', '@option')), /Ligne 3 : .*@option/);
+  assert.throws(() => parseScript(inEvent('@choix', '@sinon')), /Ligne 3 : @sinon en dehors/);
+  assert.throws(() => parseScript(inEvent('@choix', '@option x.a')), /Ligne 2 : .*@choix n'est jamais fermé/);
+  assert.throws(
+    () => parseScript(inEvent('@choix', '@option x.1', '@option x.2', '@option x.3', '@option x.4', '@option x.5', '@fin')),
+    /Ligne 7 : .*au plus 4 options/,
+  );
+});
+
 test('deux événements ne peuvent pas porter le même nom', () => {
   assert.throws(
     () => parseScript('@event a quand chapitre.debut\n@event a quand chapitre.victoire'),

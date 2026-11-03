@@ -19,18 +19,29 @@ export type Condition =
   | { type: 'turn'; op: ComparisonOp; value: number } // tour >= 3
   | { type: 'not'; condition: Condition }; // non <condition>
 
+// Une réponse proposée au joueur : le libellé (clé de traduction) et ce qui se passe si elle est choisie.
+export interface ChoiceOption {
+  key: string;
+  commands: Command[];
+}
+
 export type Command =
   | { op: 'say'; speaker: string; key: string } // réplique : `perso: clé`
   | { op: 'show'; who: string; side: Side } // @montre perso gauche|droite
   | { op: 'hide'; who: string } // @cache perso
   | { op: 'flag'; name: string; value: boolean } // @drapeau nom (vrai), @efface nom (faux)
-  | { op: 'if'; condition: Condition; then: Command[]; otherwise: Command[] }; // @si … @sinon … @fin
+  | { op: 'if'; condition: Condition; then: Command[]; otherwise: Command[] } // @si … @sinon … @fin
+  | { op: 'choice'; options: ChoiceOption[] }; // @choix, puis des @option … @fin
+
+export type ChoiceCommand = Extract<Command, { op: 'choice' }>;
 
 export interface ScriptEvent {
   id: string;
   trigger: Trigger;
   commands: Command[];
 }
+
+export const MAX_CHOICES = 4;
 
 export class ScriptError extends Error {
   readonly line: number;
@@ -48,6 +59,7 @@ const TRIGGER = new RegExp(
 );
 const TEST = new RegExp(`^(vivant|mort|drapeau)\\((${NAME})\\)$`);
 const SAY = /^([a-z][a-z0-9-]*)\s*:\s*([A-Za-z0-9][\w.-]*)$/;
+const KEY = /^[A-Za-z0-9][\w.-]*$/;
 const SIDES: readonly string[] = ['gauche', 'droite'];
 const OPERATORS: readonly string[] = ['==', '>=', '<=', '>', '<'];
 
@@ -57,16 +69,14 @@ const isOperator = (value: string): value is ComparisonOp => OPERATORS.includes(
 
 type IfCommand = Extract<Command, { op: 'if' }>;
 
-// Un bloc @si ouvert, en attente de son @fin.
-interface Block {
-  command: IfCommand;
-  line: number;
-  inElse: boolean;
-}
+// Un bloc ouvert (@si ou @choix), en attente de son @fin.
+type Block =
+  | { kind: 'if'; command: IfCommand; line: number; inElse: boolean }
+  | { kind: 'choice'; command: ChoiceCommand; line: number };
 
 // Lit un script texte : des blocs `@event <nom> quand <déclencheur>` contenant des répliques
-// (`perso: clé`) et des commandes (`@montre`, `@cache`, `@drapeau`, `@efface`, `@si`/`@sinon`/`@fin`).
-// Les lignes vides et celles qui commencent par `#` sont ignorées.
+// (`perso: clé`) et des commandes (`@montre`, `@cache`, `@drapeau`, `@efface`, `@si`/`@sinon`/`@fin`,
+// `@choix`/`@option`/`@fin`). Les lignes vides et celles qui commencent par `#` sont ignorées.
 export function parseScript(text: string): ScriptEvent[] {
   const events: ScriptEvent[] = [];
   let current: ScriptEvent | undefined;
@@ -100,21 +110,31 @@ export function parseScript(text: string): ScriptEvent[] {
     const command = parseCommand(line, words, lineNumber, blocks);
     if (command === null) continue;
 
-    const top = blocks.at(-1);
-    const target = top === undefined ? current.commands : top.inElse ? top.command.otherwise : top.command.then;
-    target.push(command);
-    if (command.op === 'if') blocks.push({ command, line: lineNumber, inElse: false });
+    targetOf(current, blocks.at(-1), lineNumber).push(command);
+    if (command.op === 'if') blocks.push({ kind: 'if', command, line: lineNumber, inElse: false });
+    if (command.op === 'choice') blocks.push({ kind: 'choice', command, line: lineNumber });
   }
   assertClosed(blocks);
   return events;
 }
 
-function assertClosed(blocks: Block[]): void {
-  const open = blocks[0];
-  if (open !== undefined) throw new ScriptError(open.line, "ce bloc @si n'est jamais fermé (@fin manquant)");
+// La liste de commandes qui reçoit la ligne en cours : l'événement, une branche de @si, ou l'@option ouverte.
+function targetOf(event: ScriptEvent, top: Block | undefined, lineNumber: number): Command[] {
+  if (top === undefined) return event.commands;
+  if (top.kind === 'if') return top.inElse ? top.command.otherwise : top.command.then;
+  const option = top.command.options.at(-1);
+  if (option === undefined) throw new ScriptError(lineNumber, 'dans un @choix, chaque ligne doit se trouver sous une @option');
+  return option.commands;
 }
 
-// Renvoie la commande à ajouter, ou null pour @sinon et @fin qui ne font que modifier les blocs ouverts.
+function assertClosed(blocks: Block[]): void {
+  const open = blocks[0];
+  if (open !== undefined) {
+    throw new ScriptError(open.line, `ce bloc ${open.kind === 'if' ? '@si' : '@choix'} n'est jamais fermé (@fin manquant)`);
+  }
+}
+
+// Renvoie la commande à ajouter, ou null pour @sinon, @option et @fin qui ne font que modifier les blocs ouverts.
 function parseCommand(line: string, words: string[], lineNumber: number, blocks: Block[]): Command | null {
   const [name, who, side] = words;
 
@@ -137,14 +157,34 @@ function parseCommand(line: string, words: string[], lineNumber: number, blocks:
       return { op: 'if', condition: parseCondition(words.slice(1), lineNumber), then: [], otherwise: [] };
     case '@sinon': {
       const top = blocks.at(-1);
-      if (top === undefined) throw new ScriptError(lineNumber, '@sinon en dehors d\'un bloc @si');
+      if (top === undefined || top.kind !== 'if') throw new ScriptError(lineNumber, "@sinon en dehors d'un bloc @si");
       if (top.inElse) throw new ScriptError(lineNumber, 'ce bloc @si a déjà un @sinon');
       top.inElse = true;
       return null;
     }
-    case '@fin':
-      if (blocks.pop() === undefined) throw new ScriptError(lineNumber, '@fin sans @si correspondant');
+    case '@choix':
+      if (words.length !== 1) throw new ScriptError(lineNumber, 'syntaxe attendue « @choix » seul sur sa ligne');
+      return { op: 'choice', options: [] };
+    case '@option': {
+      const top = blocks.at(-1);
+      if (top === undefined || top.kind !== 'choice') throw new ScriptError(lineNumber, "@option en dehors d'un bloc @choix");
+      if (words.length !== 2 || who === undefined || !KEY.test(who)) {
+        throw new ScriptError(lineNumber, 'syntaxe attendue « @option <clé> » (la clé du libellé)');
+      }
+      if (top.command.options.length >= MAX_CHOICES) {
+        throw new ScriptError(lineNumber, `un @choix propose au plus ${MAX_CHOICES} options`);
+      }
+      top.command.options.push({ key: who, commands: [] });
       return null;
+    }
+    case '@fin': {
+      const closed = blocks.pop();
+      if (closed === undefined) throw new ScriptError(lineNumber, '@fin sans @si ni @choix correspondant');
+      if (closed.kind === 'choice' && closed.command.options.length === 0) {
+        throw new ScriptError(closed.line, "ce bloc @choix n'a aucune @option");
+      }
+      return null;
+    }
   }
   if (name?.startsWith('@')) throw new ScriptError(lineNumber, `commande inconnue : ${name}`);
 

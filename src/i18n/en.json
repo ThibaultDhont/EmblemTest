@@ -28,6 +28,7 @@
   "dialogue.history": "History",
   "dialogue.skip": "Skip",
   "dialogue.skipConfirm": "Sure?",
+  "dialogue.choice": "Choice",
   "hud.turn": "Turn {turn}",
   "hud.enemyPhase": "Turn {turn} · Enemy phase",
   "outcome.victory": "Victory!",

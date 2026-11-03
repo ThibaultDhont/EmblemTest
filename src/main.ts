@@ -2,15 +2,18 @@ import { planEnemyAction } from './core/ai.ts';
 import { applyEvent, resolveCombat } from './core/combat.ts';
 import type { CombatEvent } from './core/combat.ts';
 import {
+  CHOICE,
   NARRATION,
+  choiceOptionAt,
+  choose,
   dialogueButtonAt,
   historyButtonAt,
-  nextLine,
+  nextStep,
   skipRest,
   startDialogue,
   takeEvents,
 } from './core/dialogue.ts';
-import type { DialogueRunner, Line } from './core/dialogue.ts';
+import type { Choice, DialogueRunner, Line } from './core/dialogue.ts';
 import type { ScriptEvent, Trigger } from './core/script.ts';
 import { cancel, confirm, createUiState, finishAction, finishMove, resetUi, setCursor } from './core/selection.ts';
 import type { Playback } from './core/selection.ts';
@@ -21,6 +24,7 @@ import { createChapter1 } from './data/chapter1.ts';
 import { detectLanguage, setLanguage, storyText, t } from './i18n/index.ts';
 import type { Action } from './input/actions.ts';
 import { attachMouse } from './input/mouse.ts';
+import type { DialogueView } from './render/dialogue.ts';
 import { createRenderer } from './render/renderer.ts';
 import type { Effects } from './render/renderer.ts';
 
@@ -59,7 +63,7 @@ if (canvas === null) throw new Error('Canvas #game introuvable');
 
 const state = createChapter1();
 const ui = createUiState();
-const fx: Effects = { flashId: null, popup: null, dialogue: null, history: null, showOutcome: false };
+const fx: Effects = { flashId: null, popup: null, dialogue: null, choice: null, history: null, showOutcome: false };
 const renderer = createRenderer(canvas);
 let enemyPhaseRunning = false;
 let endHandled = false;
@@ -143,26 +147,35 @@ function scheduleAuto(active: ActiveDialogue): void {
   window.clearTimeout(active.autoTimer);
   active.autoTimer = undefined;
   const view = fx.dialogue;
-  if (!autoMode || fx.history !== null || view === null || view.revealed < view.text.length) return;
+  if (!autoMode || fx.history !== null || fx.choice !== null || view === null || view.revealed < view.text.length) return;
   active.autoTimer = window.setTimeout(() => {
     active.autoTimer = undefined;
     if (dialogue === active) stepDialogue(active);
   }, AUTO_DELAY_MS);
 }
 
-// Affiche une réplique, dont le texte s'écrit lettre par lettre.
-function startLine(active: ActiveDialogue, line: Line, eventId: string): void {
-  remember(eventId, line);
-  const text = storyText(line.key);
-  const view = {
+function nameOf(speaker: string): string {
+  if (speaker === NARRATION) return '';
+  return speaker === CHOICE ? t('dialogue.choice') : storyText(`char.${speaker}`);
+}
+
+function lineView(line: Line, revealed: number): DialogueView {
+  return {
     speaker: line.speaker,
-    name: line.speaker === NARRATION ? '' : storyText(`char.${line.speaker}`),
-    text,
-    revealed: 0,
+    name: nameOf(line.speaker),
+    text: storyText(line.key),
+    revealed,
     cast: line.cast,
     auto: autoMode,
     skipPending: false,
   };
+}
+
+// Affiche une réplique, dont le texte s'écrit lettre par lettre.
+function startLine(active: ActiveDialogue, line: Line, eventId: string): void {
+  remember(eventId, line);
+  const view = lineView(line, 0);
+  const text = view.text;
   fx.dialogue = view;
   const type = (): void => {
     view.revealed += 1;
@@ -180,10 +193,33 @@ function startLine(active: ActiveDialogue, line: Line, eventId: string): void {
 
 function endDialogue(active: ActiveDialogue): void {
   fx.dialogue = null;
+  fx.choice = null;
   fx.history = null;
   dialogue = null;
   draw();
   active.done();
+}
+
+// Propose les réponses au joueur. La boîte de dialogue reste dessous (vide si le choix ouvre l'événement).
+function startChoice(choice: Choice): void {
+  if (fx.dialogue === null) {
+    fx.dialogue = { speaker: NARRATION, name: '', text: '', revealed: 0, cast: choice.cast, auto: autoMode, skipPending: false };
+  } else {
+    fx.dialogue.cast = choice.cast;
+  }
+  fx.choice = { options: choice.options.map((key) => storyText(key)) };
+  draw();
+}
+
+// Le joueur a répondu : son choix entre dans l'historique et la lecture continue dans l'option choisie.
+function pick(active: ActiveDialogue, index: number): void {
+  const runner = active.runner;
+  if (runner === null) return;
+  const key = choose(runner, index);
+  if (key === undefined) return;
+  remember(runner.eventId, { speaker: CHOICE, key, cast: [] });
+  fx.choice = null;
+  stepDialogue(active);
 }
 
 // Passe à la réplique suivante, d'un événement ou du suivant ; termine si plus rien ne reste.
@@ -198,12 +234,13 @@ function stepDialogue(active: ActiveDialogue): void {
       }
       active.runner = startDialogue(event);
     }
-    const line = nextLine(active.runner, state);
-    if (line === null) {
+    const step = nextStep(active.runner, state);
+    if (step === null) {
       active.runner = null;
       continue;
     }
-    startLine(active, line, active.runner.eventId);
+    if (step.type === 'line') startLine(active, step.line, active.runner.eventId);
+    else startChoice(step.choice);
     return;
   }
 }
@@ -211,7 +248,7 @@ function stepDialogue(active: ActiveDialogue): void {
 // Un clic affiche d'abord toute la réplique, puis passe à la suivante.
 function advanceDialogue(active: ActiveDialogue): void {
   const view = fx.dialogue;
-  if (view === null) return;
+  if (view === null || fx.choice !== null) return;
   if (view.revealed < view.text.length) {
     window.clearTimeout(active.timer);
     active.timer = undefined;
@@ -230,10 +267,11 @@ function cancelSkip(active: ActiveDialogue): void {
 }
 
 // Premier clic : demande confirmation. Second clic : saute le reste de l'événement en cours (ses drapeaux
-// sont appliqués, ses répliques entrent dans l'historique) et passe au suivant s'il y en a un.
+// sont appliqués, ses répliques entrent dans l'historique) jusqu'au prochain choix, qui s'affiche alors ;
+// sans choix, passe à l'événement suivant s'il y en a un.
 function askSkip(active: ActiveDialogue): void {
   const view = fx.dialogue;
-  if (view === null) return;
+  if (view === null || fx.choice !== null) return;
   if (!view.skipPending) {
     view.skipPending = true;
     active.skipTimer = window.setTimeout(() => {
@@ -247,8 +285,10 @@ function askSkip(active: ActiveDialogue): void {
 
   const runner = active.runner;
   if (runner !== null) {
-    for (const line of skipRest(runner, state)) remember(runner.eventId, line);
-    active.runner = null;
+    const skipped = skipRest(runner, state);
+    for (const line of skipped) remember(runner.eventId, line);
+    const last = skipped.at(-1);
+    if (last !== undefined) fx.dialogue = lineView(last, storyText(last.key).length);
   }
   stepDialogue(active);
 }
@@ -266,7 +306,7 @@ function openHistory(active: ActiveDialogue): void {
   fx.history = {
     entries: log.map((entry) => ({
       eventId: entry.eventId,
-      name: entry.speaker === NARRATION ? '' : storyText(`char.${entry.speaker}`),
+      name: nameOf(entry.speaker),
       text: storyText(entry.key),
     })),
     offset: 0,
@@ -280,7 +320,8 @@ function closeHistory(active: ActiveDialogue): void {
   draw();
 }
 
-// Pendant un dialogue, la carte est inaccessible : seuls le texte, ses trois boutons et l'historique réagissent.
+// Pendant un dialogue, la carte est inaccessible : seuls le texte, ses trois boutons, l'historique et, le cas
+// échéant, les réponses d'un choix réagissent. Un choix n'avance que par une réponse.
 function handleDialogueAction(active: ActiveDialogue, action: Action): void {
   const history = fx.history;
   if (history !== null) {
@@ -292,6 +333,21 @@ function handleDialogueAction(active: ActiveDialogue, action: Action): void {
       if (arrow === 'up') history.offset += HISTORY_PAGE;
       else if (arrow === 'down') history.offset -= HISTORY_PAGE;
       else closeHistory(active);
+    }
+    draw();
+    return;
+  }
+
+  const choice = fx.choice;
+  if (choice !== null) {
+    if (action.type === 'setCursor') {
+      setCursor(state, ui, action.pos);
+    } else if (action.type === 'cancel') {
+      openHistory(active);
+    } else if (action.type === 'confirm') {
+      const index = choiceOptionAt(ui.cursor, choice.options.length);
+      if (index !== undefined) pick(active, index);
+      else if (dialogueButtonAt(ui.cursor) === 'history') openHistory(active);
     }
     draw();
     return;

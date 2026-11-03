@@ -9,8 +9,17 @@
   anna: ch1.intro.3
   @montre lise droite
   lise: ch1.intro.4
-  @cache marc
   anna: ch1.intro.5
+  marc: ch1.choix.question
+  # Le choix du joueur ne fait que poser un drapeau, que d'autres dialogues relisent plus tard.
+  @choix
+    @option ch1.choix.fonce
+      @drapeau audacieux
+      marc: ch1.choix.fonce.reponse
+    @option ch1.choix.observe
+      @drapeau prudent
+      marc: ch1.choix.observe.reponse
+  @fin
 
 # Au début de la phase ennemie du tour 2, tant que le boss est debout.
 @event pressentiment quand tour.ennemi(2)
@@ -26,6 +35,11 @@
     marc: ch1.tour3.mort
   @sinon
     marc: ch1.tour3.vivant
+  @fin
+  @si drapeau(prudent)
+    marc: ch1.tour3.prudent
+  @sinon
+    marc: ch1.tour3.audacieux
   @fin
 
 # Quand Lise tombe : le drapeau sert à changer le dialogue de victoire.

@@ -1,6 +1,6 @@
 # Cadrage du projet
 
-Document de référence des décisions de conception. Dernière mise à jour : 2026-11-03, après la revue complète des thèmes (jalons 1 à 3 et étapes 4a à 4c terminés).
+Document de référence des décisions de conception. Dernière mise à jour : 2026-11-03, après la revue complète des thèmes (jalons 1 à 3 et étapes 4a à 4d terminés).
 
 Ce document remplace les choix précédents quand ils diffèrent (voir « Changements par rapport au départ »).
 
@@ -116,7 +116,7 @@ Ce document remplace les choix précédents quand ils diffèrent (voir « Change
    - **4a (fait)** : format de script, analyseur, boîte de dialogue avec portraits, dialogues de début et de fin de chapitre.
    - **4b (fait)** : déclencheurs de début de tour (joueur et ennemi) et de mort d'une unité, conditions (vivant, mort, tour, drapeaux), blocs @si/@sinon, drapeaux, événements joués une seule fois.
    - **4c (fait)** : mode Auto (passage automatique après 3 secondes), passer un dialogue avec confirmation, historique de tous les dialogues déjà vus. La vitesse du texte réglable est reportée au menu d'options.
-   - 4d : choix du joueur dans les dialogues, routes et drapeaux d'embranchement.
+   - **4d (fait)** : choix du joueur dans les dialogues (`@choix` / `@option`, jusqu'à 4 options, panneau au milieu de l'écran), drapeaux d'embranchement relus par les dialogues suivants. « Passer » s'arrête au choix, Auto est en pause, le choix entre dans l'historique. Changer de route ou de chapitre suppose l'enchaînement des chapitres.
    - 4e : mise en scène : unités qui apparaissent ou se déplacent, changement d'objectif, ennemi qui passe dans le camp.
    - 4f : déclencheurs d'actions du joueur en cours de niveau : première attaque contre un ennemi donné, case atteinte ou lieu visité, commande « Parler » entre deux unités adjacentes (recrutement), sélection d'une unité (tutoriel).
 2. Caméra et défilement, entrées tactiles.
@@ -127,8 +127,8 @@ Ce document remplace les choix précédents quand ils diffèrent (voir « Change
 7. Art, écran de combat dédié, audio.
 8. Tranche verticale : un chapitre complet, puis quelques chapitres pour les premiers tests.
 
-## État actuel du code (jalons 1 à 3 et étapes 4a à 4c)
+## État actuel du code (jalons 1 à 3 et étapes 4a à 4d)
 
-**Fait** : grille et déplacement avec coût de terrain, combat (triangle physique, double attaque, riposte selon la portée, critique, 2RN), mort définitive, phases joueur et ennemie, IA à trois profils, seigneur et boss avec écran de fin, déplacements animés, i18n fr/en, script de dialogues (format texte, analyseur, interpréteur avec blocs @si et drapeaux), dialogues avec portraits provisoires et texte progressif (mode Auto, passer avec confirmation, historique), déclencheurs de début et de fin de chapitre, de début de tour et de mort d'une unité, tests.
+**Fait** : grille et déplacement avec coût de terrain, combat (triangle physique, double attaque, riposte selon la portée, critique, 2RN), mort définitive, phases joueur et ennemie, IA à trois profils, seigneur et boss avec écran de fin, déplacements animés, i18n fr/en, script de dialogues (format texte, analyseur, interpréteur avec blocs @si et drapeaux), dialogues avec portraits provisoires et texte progressif (mode Auto, passer avec confirmation, historique, choix du joueur), déclencheurs de début et de fin de chapitre, de début de tour et de mort d'une unité, tests.
 
-**Pas encore fait** : tout ce qui n'est pas listé ci-dessus, en particulier la suite du récit (étapes 4d à 4f, narration entre les niveaux), la caméra, la sauvegarde, la progression, la magie, l'inventaire et les vrais assets.
+**Pas encore fait** : tout ce qui n'est pas listé ci-dessus, en particulier la suite du récit (étapes 4e et 4f, narration entre les niveaux), la caméra, la sauvegarde, la progression, la magie, l'inventaire et les vrais assets.
