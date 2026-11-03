@@ -18,6 +18,10 @@ export type AiProfile = 'charge' | 'guard' | 'stationary';
 
 export type Outcome = 'playing' | 'victory' | 'defeat';
 
+// Ce qu'il faut accomplir pour gagner : vaincre le boss, vaincre tous les ennemis, ou tenir jusqu'à la
+// fin de la phase ennemie du tour `turns`. La défaite (mort du seigneur) ne dépend pas de l'objectif.
+export type Objective = { type: 'boss' } | { type: 'rout' } | { type: 'survive'; turns: number };
+
 export interface Stats {
   maxHp: number;
   str: number; // Force
@@ -49,6 +53,7 @@ export interface GameState {
   turn: number;
   phase: Team; // camp qui joue
   outcome: Outcome;
+  objective: Objective;
   fired: string[]; // identifiants des événements de script déjà joués
   flags: string[]; // drapeaux de récit actifs, posés et lus par les scripts
   reserve: Unit[]; // unités hors de la carte, que @apparait y fera arriver

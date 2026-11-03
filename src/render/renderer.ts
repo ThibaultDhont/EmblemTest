@@ -5,7 +5,8 @@ import type { UiState } from '../core/selection.ts';
 import type { ClassId, GameState, Pos, TerrainId, Team, Unit } from '../core/types.ts';
 import { drawChoice, drawDialogue, drawHistory } from './dialogue.ts';
 import type { ChoiceView, DialogueView, HistoryView } from './dialogue.ts';
-import { drawForecast, drawHud, drawInfoPanel, drawMenu, drawOutcome } from './panels.ts';
+import { drawBanner, drawForecast, drawHud, drawInfoPanel, drawMenu, drawOutcome } from './panels.ts';
+import type { Banner } from './panels.ts';
 
 // Effets ponctuels : lecture d'un combat, dialogue en cours, écran de fin.
 export interface Effects {
@@ -16,6 +17,7 @@ export interface Effects {
   history: HistoryView | null; // fenêtre d'historique, ouverte par-dessus un dialogue
   showOutcome: boolean; // l'écran de victoire ou de défaite apparaît après les dialogues de fin
   staging: boolean; // mise en scène en cours : seuls la carte et les unités restent affichés
+  banner: Banner | null; // annonce de l'objectif, par-dessus la carte
 }
 
 export interface Renderer {
@@ -66,6 +68,7 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
       for (const unit of state.units) drawUnit(ctx, unit, fx.flashId === unit.id);
       if (!fx.staging) drawCursor(ctx, ui);
       drawPopup(ctx, fx);
+      if (fx.banner !== null) drawBanner(ctx, fx.banner);
       if (fx.staging) return;
 
       if (fx.dialogue !== null) {

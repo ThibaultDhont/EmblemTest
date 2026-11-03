@@ -1,3 +1,5 @@
+import type { Objective } from './types.ts';
+
 export type Side = 'gauche' | 'droite';
 
 // Quand un événement se déclenche. `tour.joueur(N)` : début de la phase joueur du tour N ;
@@ -34,7 +36,8 @@ export type Command =
   | { op: 'choice'; options: ChoiceOption[] } // @choix, puis des @option … @fin
   | { op: 'spawn'; unit: string; x: number; y: number } // @apparait id x y : une unité de la réserve arrive
   | { op: 'move'; unit: string; x: number; y: number } // @deplace id x y : déplacement de mise en scène
-  | { op: 'recruit'; unit: string }; // @recrute id : une unité ennemie passe dans le camp du joueur
+  | { op: 'recruit'; unit: string } // @recrute id : une unité ennemie passe dans le camp du joueur
+  | { op: 'objective'; objective: Objective }; // @objectif boss | deroute | survie N
 
 export type ChoiceCommand = Extract<Command, { op: 'choice' }>;
 
@@ -171,6 +174,8 @@ function parseCommand(line: string, words: string[], lineNumber: number, blocks:
         throw new ScriptError(lineNumber, 'syntaxe attendue « @recrute <unité> »');
       }
       return { op: 'recruit', unit: who };
+    case '@objectif':
+      return { op: 'objective', objective: parseObjective(words.slice(1), lineNumber) };
     case '@si':
       return { op: 'if', condition: parseCondition(words.slice(1), lineNumber), then: [], otherwise: [] };
     case '@sinon': {
@@ -213,6 +218,17 @@ function parseCommand(line: string, words: string[], lineNumber: number, blocks:
     throw new ScriptError(lineNumber, 'réplique invalide, attendu « perso: clé » (par exemple « anna: ch1.intro.1 »)');
   }
   return { op: 'say', speaker, key };
+}
+
+// boss, deroute (vaincre tous les ennemis) ou `survie N` (tenir jusqu'à la fin du tour N, N ≥ 1).
+function parseObjective(words: string[], lineNumber: number): Objective {
+  const [kind, turns] = words;
+  if (words.length === 1 && kind === 'boss') return { type: 'boss' };
+  if (words.length === 1 && kind === 'deroute') return { type: 'rout' };
+  if (words.length === 2 && kind === 'survie' && turns !== undefined && /^[1-9]\d*$/.test(turns)) {
+    return { type: 'survive', turns: Number(turns) };
+  }
+  throw new ScriptError(lineNumber, 'syntaxe attendue « @objectif boss », « @objectif deroute » ou « @objectif survie <N> » (N ≥ 1)');
 }
 
 // vivant(id), mort(id), drapeau(nom) ou `tour <op> N`, éventuellement précédés de `non`.

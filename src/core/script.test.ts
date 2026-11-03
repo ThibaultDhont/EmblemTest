@@ -228,6 +228,21 @@ test('syntaxes invalides de la mise en scène des unités', () => {
   assert.throws(() => parseScript(inEvent('@recrute a b')), /Ligne 2 : .*@recrute/);
 });
 
+test('@objectif reconnaît ses trois formes', () => {
+  const [event] = parseScript(inEvent('@objectif boss', '@objectif deroute', '@objectif survie 4'));
+  assert.deepEqual(event?.commands, [
+    { op: 'objective', objective: { type: 'boss' } },
+    { op: 'objective', objective: { type: 'rout' } },
+    { op: 'objective', objective: { type: 'survive', turns: 4 } },
+  ]);
+});
+
+test('@objectif mal formé est refusé', () => {
+  for (const bad of ['', 'survie', 'survie 0', 'survie x', 'survie 2 3', 'boss 3', 'tout']) {
+    assert.throws(() => parseScript(inEvent(`@objectif ${bad}`)), /Ligne 2 : .*@objectif/, bad);
+  }
+});
+
 test('deux événements ne peuvent pas porter le même nom', () => {
   assert.throws(
     () => parseScript('@event a quand chapitre.debut\n@event a quand chapitre.victoire'),

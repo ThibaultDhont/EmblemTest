@@ -25,6 +25,7 @@ import { detectLanguage, setLanguage, storyText, t } from './i18n/index.ts';
 import type { Action } from './input/actions.ts';
 import { attachMouse } from './input/mouse.ts';
 import type { DialogueView } from './render/dialogue.ts';
+import { objectiveText } from './render/panels.ts';
 import { createRenderer } from './render/renderer.ts';
 import type { Effects } from './render/renderer.ts';
 
@@ -33,6 +34,7 @@ const COMBAT_STEP_MS = 600;
 const ENEMY_PAUSE_MS = 350;
 const TEXT_STEP_MS = 25;
 const STAGE_BEAT_MS = 500; // éclair et pause quand une unité apparaît ou change de camp
+const BANNER_MS = 2200; // durée de la bannière d'objectif
 const AUTO_DELAY_MS = 3000; // mode Auto : délai entre la fin de l'affichage d'une réplique et la suivante
 const SKIP_CONFIRM_MS = 3000; // « Passer » : temps laissé pour confirmer
 const HISTORY_LIMIT = 300;
@@ -73,6 +75,7 @@ const fx: Effects = {
   history: null,
   showOutcome: false,
   staging: false,
+  banner: null,
 };
 const renderer = createRenderer(canvas);
 let enemyPhaseRunning = false;
@@ -210,6 +213,17 @@ function endDialogue(active: ActiveDialogue): void {
   active.done();
 }
 
+// Annonce l'objectif en cours dans une bannière, puis appelle `done`.
+function showBanner(titleKey: 'objective.title' | 'objective.new', done: () => void): void {
+  fx.banner = { title: t(titleKey), text: objectiveText(state.objective) };
+  draw();
+  window.setTimeout(() => {
+    fx.banner = null;
+    draw();
+    done();
+  }, BANNER_MS);
+}
+
 // Mise en scène : le dialogue s'efface le temps de montrer l'action sur la carte, puis reprend.
 // Un déplacement est animé case par case ; une apparition ou un recrutement s'accompagne d'un éclair.
 function playStage(active: ActiveDialogue, step: StageStep): void {
@@ -227,6 +241,8 @@ function playStage(active: ActiveDialogue, step: StageStep): void {
     const unit = state.units.find((other) => other.id === step.unitId);
     if (unit === undefined) finish();
     else playMove(unit, step.path, finish);
+  } else if (step.type === 'objective') {
+    showBanner('objective.new', finish);
   } else {
     fx.flashId = step.unitId;
     draw();
@@ -478,7 +494,8 @@ function playEnemies(): void {
       resetUi(ui);
       enemyPhaseRunning = false;
       draw();
-      playTriggers([`tour.joueur(${state.turn})`], draw);
+      if (state.outcome !== 'playing') settleOutcome(); // objectif de survie atteint
+      else playTriggers([`tour.joueur(${state.turn})`], draw);
       return;
     }
     const unit = state.units.find((other) => other.id === id);
@@ -559,4 +576,4 @@ function dispatch(action: Action): void {
 
 attachMouse(canvas, dispatch);
 draw();
-playTriggers(['chapitre.debut'], () => playTriggers(['tour.joueur(1)'], draw));
+playTriggers(['chapitre.debut'], () => playTriggers(['tour.joueur(1)'], () => showBanner('objective.title', draw)));

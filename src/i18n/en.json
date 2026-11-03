@@ -31,6 +31,12 @@
   "dialogue.choice": "Choice",
   "hud.turn": "Turn {turn}",
   "hud.enemyPhase": "Turn {turn} · Enemy phase",
+  "hud.objective": "Objective: {text}",
+  "objective.boss": "Defeat the boss",
+  "objective.rout": "Defeat all enemies",
+  "objective.survive": "Survive until the end of turn {turns}",
+  "objective.title": "Objective",
+  "objective.new": "New objective",
   "outcome.victory": "Victory!",
   "outcome.defeat": "Defeat",
   "outcome.retry": "Click to play again"

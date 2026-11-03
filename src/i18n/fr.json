@@ -31,6 +31,12 @@
   "dialogue.choice": "Choix",
   "hud.turn": "Tour {turn}",
   "hud.enemyPhase": "Tour {turn} · Phase ennemie",
+  "hud.objective": "Objectif : {text}",
+  "objective.boss": "Vaincre le boss",
+  "objective.rout": "Vaincre tous les ennemis",
+  "objective.survive": "Tenir jusqu'à la fin du tour {turns}",
+  "objective.title": "Objectif",
+  "objective.new": "Nouvel objectif",
   "outcome.victory": "Victoire !",
   "outcome.defeat": "Défaite",
   "outcome.retry": "Cliquer pour rejouer"

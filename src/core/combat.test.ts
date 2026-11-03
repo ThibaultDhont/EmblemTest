@@ -167,6 +167,18 @@ test('la mort du seigneur fait perdre, celle du boss fait gagner, une autre mort
   assert.equal(other.state.outcome, 'playing');
 });
 
+test("l'objectif décide ce qui fait gagner : déroute ou survie", () => {
+  const rout = duel();
+  rout.state.objective = { type: 'rout' };
+  applyEvent(rout.state, { type: 'death', unitId: 'd' });
+  assert.equal(rout.state.outcome, 'victory'); // plus aucun ennemi
+
+  const survive = duel({}, { role: 'boss' });
+  survive.state.objective = { type: 'survive', turns: 3 };
+  applyEvent(survive.state, { type: 'death', unitId: 'd' });
+  assert.equal(survive.state.outcome, 'playing'); // le boss ne suffit plus
+});
+
 test('applyEvent met à jour les PV et retire les morts', () => {
   const { state, attacker, defender } = duel();
   applyEvent(state, { type: 'strike', attackerId: 'a', targetId: 'd', hit: true, crit: false, damage: 8, targetHp: 12 });

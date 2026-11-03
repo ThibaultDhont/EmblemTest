@@ -4,7 +4,7 @@ import type { Combatant } from '../core/combat.ts';
 import { terrainAt, unitAt } from '../core/grid.ts';
 import { MENU_WIDTH, menuItemAt } from '../core/selection.ts';
 import type { Menu, UiState } from '../core/selection.ts';
-import type { GameState } from '../core/types.ts';
+import type { GameState, Objective } from '../core/types.ts';
 import { CLASSES } from '../data/classes.ts';
 import { TERRAINS } from '../data/terrains.ts';
 import { t } from '../i18n/index.ts';
@@ -109,12 +109,54 @@ export function drawForecast(ctx: CanvasRenderingContext2D, state: GameState, ui
   });
 }
 
+export function objectiveText(objective: Objective): string {
+  switch (objective.type) {
+    case 'boss':
+      return t('objective.boss');
+    case 'rout':
+      return t('objective.rout');
+    case 'survive':
+      return t('objective.survive', { turns: objective.turns });
+  }
+}
+
+// Le tour et l'objectif en cours, en bas à gauche.
 export function drawHud(ctx: CanvasRenderingContext2D, state: GameState): void {
-  const text = t(state.phase === 'enemy' ? 'hud.enemyPhase' : 'hud.turn', { turn: state.turn });
+  const lines = [
+    t(state.phase === 'enemy' ? 'hud.enemyPhase' : 'hud.turn', { turn: state.turn }),
+    t('hud.objective', { text: objectiveText(state.objective) }),
+  ];
   setText(ctx);
-  drawBox(ctx, 4, SCREEN_HEIGHT - 14, textWidth(ctx, [text]) + 8, 10);
+  const height = lines.length * 10 + 4;
+  const top = SCREEN_HEIGHT - height - 4;
+  drawBox(ctx, 4, top, textWidth(ctx, lines) + 8, height);
   ctx.fillStyle = '#ffffff';
-  ctx.fillText(text, 8, SCREEN_HEIGHT - 12);
+  lines.forEach((line, row) => ctx.fillText(line, 8, top + 2 + row * 10));
+}
+
+// Bande au milieu de l'écran qui annonce l'objectif, au début du chapitre ou quand il change.
+export interface Banner {
+  title: string;
+  text: string;
+}
+
+export function drawBanner(ctx: CanvasRenderingContext2D, banner: Banner): void {
+  const top = 96;
+  const height = 52;
+  ctx.fillStyle = 'rgba(10, 14, 30, 0.88)';
+  ctx.fillRect(0, top, SCREEN_WIDTH, height);
+  ctx.fillStyle = '#e8e8f0';
+  ctx.fillRect(0, top, SCREEN_WIDTH, 1);
+  ctx.fillRect(0, top + height - 1, SCREEN_WIDTH, 1);
+
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.font = '8px monospace';
+  ctx.fillStyle = '#ffe14d';
+  ctx.fillText(banner.title, SCREEN_WIDTH / 2, top + 16);
+  ctx.font = 'bold 12px monospace';
+  ctx.fillStyle = '#ffffff';
+  ctx.fillText(banner.text, SCREEN_WIDTH / 2, top + 34);
 }
 
 // Écran de fin de partie : voile sombre, titre et invitation à rejouer.

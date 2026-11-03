@@ -450,6 +450,18 @@ test('skipRest applique d\'un coup apparitions, déplacements et recrutements', 
   assert.deepEqual(state.reserve, []);
 });
 
+test('@objectif change l\'objectif et rend une étape d\'annonce ; « passer » l\'applique aussi', () => {
+  const state = emptyState();
+  const { runner } = start('a', staged('@objectif survie 4'), state);
+  assert.deepEqual(nextStep(runner, state), { type: 'objective' });
+  assert.deepEqual(state.objective, { type: 'survive', turns: 4 });
+
+  const skipped = emptyState();
+  const run = start('a', staged('@objectif deroute'), skipped).runner;
+  assert.deepEqual(skipRest(run, skipped).map((line) => line.key), ['x.fin']);
+  assert.deepEqual(skipped.objective, { type: 'rout' });
+});
+
 test('@drapeau et @efface modifient l\'état et sont lus par les @si qui suivent', () => {
   const script = `
     @event a quand chapitre.debut

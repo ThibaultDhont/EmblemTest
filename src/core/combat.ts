@@ -1,6 +1,7 @@
 import { TERRAINS } from '../data/terrains.ts';
 import { WEAPONS } from '../data/weapons.ts';
 import { distance, posOf, terrainAt } from './grid.ts';
+import { updateOutcome } from './objective.ts';
 import type { GameState, Unit, WeaponType } from './types.ts';
 
 export type Rng = () => number; // renvoie un nombre dans [0, 1)
@@ -148,6 +149,6 @@ export function applyEvent(state: GameState, event: CombatEvent): void {
     const dead = state.units.find((unit) => unit.id === event.unitId);
     state.units = state.units.filter((unit) => unit.id !== event.unitId);
     if (dead?.role === 'lord') state.outcome = 'defeat';
-    else if (dead?.role === 'boss' && state.outcome === 'playing') state.outcome = 'victory';
+    else updateOutcome(state, dead);
   }
 }

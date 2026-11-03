@@ -19,6 +19,15 @@ test('endPlayerPhase donne la main aux ennemis sans changer de tour', () => {
   assert.equal(state.units.find((unit) => unit.id === 'e')?.acted, false);
 });
 
+test('endEnemyPhase atteint un objectif de survie, pas avant', () => {
+  const state = setup();
+  state.objective = { type: 'survive', turns: 2 };
+  endEnemyPhase(state); // le tour 2 commence : il faut encore tenir sa phase ennemie
+  assert.equal(state.outcome, 'playing');
+  endEnemyPhase(state); // le tour 3 commence : le tour 2 est tenu jusqu'au bout
+  assert.equal(state.outcome, 'victory');
+});
+
 test('endEnemyPhase ouvre le tour suivant et rend la main à tout le monde', () => {
   const state = setup();
   endPlayerPhase(state);

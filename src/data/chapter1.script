@@ -49,6 +49,9 @@
   @apparait e4 23 8
   @deplace e4 21 9
   anna: ch1.renforts.2
+  anna: ch1.renforts.3
+  # Le nouvel objectif remplace « vaincre le boss » : il suffit désormais de tenir jusqu'à la fin du tour 4.
+  @objectif survie 4
 
 # Au tour 4, un mercenaire propose ses services : accepter le fait passer dans le camp du joueur.
 @event mercenaire quand tour.joueur(4)

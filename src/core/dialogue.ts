@@ -31,7 +31,8 @@ export interface Choice {
 export type StageStep =
   | { type: 'move'; unitId: string; path: Pos[] }
   | { type: 'spawn'; unitId: string }
-  | { type: 'recruit'; unitId: string };
+  | { type: 'recruit'; unitId: string }
+  | { type: 'objective' }; // le nouvel objectif est déjà dans l'état de partie : la présentation l'annonce
 
 export type Step = { type: 'line'; line: Line } | { type: 'choice'; choice: Choice } | StageStep;
 
@@ -107,6 +108,9 @@ export function nextStep(runner: DialogueRunner, state: GameState): Step | null 
         unit.ai = undefined;
         return { type: 'recruit', unitId: unit.id };
       }
+      case 'objective':
+        state.objective = command.objective;
+        return { type: 'objective' };
     }
   }
   return null;

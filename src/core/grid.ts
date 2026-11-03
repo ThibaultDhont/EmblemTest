@@ -31,6 +31,7 @@ export function stateFromRows(rows: string[], units: Unit[], reserve: Unit[] = [
     turn: 1,
     phase: 'player',
     outcome: 'playing',
+    objective: { type: 'boss' },
     fired: [],
     flags: [],
     reserve,
