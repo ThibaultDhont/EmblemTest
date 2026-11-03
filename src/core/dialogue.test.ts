@@ -368,6 +368,88 @@ test('quatre options tiennent dans l\'écran', () => {
   assert.ok(CHOICE_BOX.y + 4 * CHOICE_BOX.rowHeight <= 16);
 });
 
+// Une carte de 10×2 avec Anna, un mercenaire ennemi et un renfort en réserve.
+function stagedState() {
+  return stateFromRows(
+    ['..........', '..........'],
+    [
+      makeUnit({ id: 'anna', pos: { x: 0, y: 0 } }),
+      makeUnit({ id: 'rik', team: 'enemy', ai: 'guard', pos: { x: 5, y: 0 } }),
+    ],
+    [makeUnit({ id: 'e4', team: 'enemy', pos: { x: 9, y: 1 } })],
+  );
+}
+
+const staged = (commands: string) => `@event a quand chapitre.debut\n  ${commands}\n  anna: x.fin`;
+
+test('@apparait fait venir une unité de la réserve et rend une étape d\'apparition', () => {
+  const state = stagedState();
+  const { runner } = start('a', staged('@apparait e4 8 1'), state);
+  assert.deepEqual(nextStep(runner, state), { type: 'spawn', unitId: 'e4' });
+  assert.deepEqual(state.reserve, []);
+  assert.deepEqual(state.units.find((unit) => unit.id === 'e4')?.pos, { x: 8, y: 1 });
+  assert.equal(nextStep(runner, state)?.type, 'line');
+});
+
+test('@apparait choisit la case libre la plus proche et ignore une unité inconnue ou déjà arrivée', () => {
+  const state = stagedState();
+  const { runner } = start('a', staged('@apparait e4 0 0\n  @apparait e4 5 1\n  @apparait fantome 3 1'), state);
+  assert.equal(nextStep(runner, state)?.type, 'spawn');
+  assert.deepEqual(state.units.find((unit) => unit.id === 'e4')?.pos, { x: 1, y: 0 }); // (0,0) est pris par Anna
+  assert.equal(nextStep(runner, state)?.type, 'line'); // les deux autres n'ont rien à montrer
+  assert.equal(state.units.length, 3);
+});
+
+test('@deplace rend le chemin sans déplacer l\'unité, et finit sur la case libre la plus proche', () => {
+  const state = stagedState();
+  const { runner } = start('a', staged('@deplace anna 5 0'), state); // (5,0) est occupée par Rik
+  const step = nextStep(runner, state);
+  assert.equal(step?.type, 'move');
+  if (step?.type !== 'move') return;
+  assert.deepEqual(step.path.at(-1), { x: 4, y: 0 });
+  assert.equal(step.path.length, 4);
+  assert.deepEqual(state.units[0]?.pos, { x: 0, y: 0 }); // la présentation anime, l'état ne bouge pas encore
+});
+
+test('@deplace sans effet : unité inconnue ou déjà sur la case', () => {
+  const state = stagedState();
+  const { runner } = start('a', staged('@deplace fantome 3 1\n  @deplace anna 0 0'), state);
+  assert.equal(nextStep(runner, state)?.type, 'line');
+});
+
+test('@recrute fait passer un ennemi dans le camp du joueur, et rien d\'autre', () => {
+  const state = stagedState();
+  const { runner } = start('a', staged('@recrute rik\n  @recrute anna\n  @recrute fantome'), state);
+  assert.deepEqual(nextStep(runner, state), { type: 'recruit', unitId: 'rik' });
+  const rik = state.units.find((unit) => unit.id === 'rik');
+  assert.equal(rik?.team, 'player');
+  assert.equal(rik?.ai, undefined);
+  assert.equal(nextStep(runner, state)?.type, 'line'); // Anna est déjà au joueur, l'autre n'existe pas
+});
+
+test('une unité en réserve n\'est ni vivante ni morte, avant d\'arriver', () => {
+  const state = stagedState();
+  assert.equal(holds({ type: 'alive', unit: 'e4' }, state), false);
+  assert.equal(holds({ type: 'dead', unit: 'e4' }, state), false);
+  assert.equal(holds({ type: 'dead', unit: 'fantome' }, state), true);
+
+  const { runner } = start('a', staged('@apparait e4 8 1'), state);
+  nextStep(runner, state);
+  assert.equal(holds({ type: 'alive', unit: 'e4' }, state), true);
+  assert.equal(holds({ type: 'dead', unit: 'e4' }, state), false);
+});
+
+test('skipRest applique d\'un coup apparitions, déplacements et recrutements', () => {
+  const state = stagedState();
+  const { runner } = start('a', staged('@apparait e4 8 1\n  @deplace e4 6 1\n  @deplace anna 3 0\n  @recrute rik'), state);
+  assert.deepEqual(skipRest(runner, state).map((line) => line.key), ['x.fin']);
+  const at = (id: string) => state.units.find((unit) => unit.id === id);
+  assert.deepEqual(at('e4')?.pos, { x: 6, y: 1 });
+  assert.deepEqual(at('anna')?.pos, { x: 3, y: 0 });
+  assert.equal(at('rik')?.team, 'player');
+  assert.deepEqual(state.reserve, []);
+});
+
 test('@drapeau et @efface modifient l\'état et sont lus par les @si qui suivent', () => {
   const script = `
     @event a quand chapitre.debut

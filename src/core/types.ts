@@ -51,4 +51,5 @@ export interface GameState {
   outcome: Outcome;
   fired: string[]; // identifiants des événements de script déjà joués
   flags: string[]; // drapeaux de récit actifs, posés et lus par les scripts
+  reserve: Unit[]; // unités hors de la carte, que @apparait y fera arriver
 }

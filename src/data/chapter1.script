@@ -42,6 +42,28 @@
     marc: ch1.tour3.audacieux
   @fin
 
+# Mise en scène : un archer arrive par l'est au début de la phase ennemie du tour 3, puis avance.
+@event renforts quand tour.ennemi(3)
+  @montre anna gauche
+  anna: ch1.renforts.1
+  @apparait e4 23 8
+  @deplace e4 21 9
+  anna: ch1.renforts.2
+
+# Au tour 4, un mercenaire propose ses services : accepter le fait passer dans le camp du joueur.
+@event mercenaire quand tour.joueur(4)
+  @si vivant(rik)
+    @montre rik droite
+    rik: ch1.rik.1
+    @choix
+      @option ch1.rik.payer
+        @recrute rik
+        rik: ch1.rik.accepte
+      @option ch1.rik.refuser
+        rik: ch1.rik.refuse
+    @fin
+  @fin
+
 # Quand Lise tombe : le drapeau sert à changer le dialogue de victoire.
 @event adieu-lise quand mort(lise)
   @montre anna gauche

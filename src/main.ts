@@ -13,7 +13,7 @@ import {
   startDialogue,
   takeEvents,
 } from './core/dialogue.ts';
-import type { Choice, DialogueRunner, Line } from './core/dialogue.ts';
+import type { Choice, DialogueRunner, Line, StageStep } from './core/dialogue.ts';
 import type { ScriptEvent, Trigger } from './core/script.ts';
 import { cancel, confirm, createUiState, finishAction, finishMove, resetUi, setCursor } from './core/selection.ts';
 import type { Playback } from './core/selection.ts';
@@ -32,6 +32,7 @@ const MOVE_STEP_MS = 90;
 const COMBAT_STEP_MS = 600;
 const ENEMY_PAUSE_MS = 350;
 const TEXT_STEP_MS = 25;
+const STAGE_BEAT_MS = 500; // éclair et pause quand une unité apparaît ou change de camp
 const AUTO_DELAY_MS = 3000; // mode Auto : délai entre la fin de l'affichage d'une réplique et la suivante
 const SKIP_CONFIRM_MS = 3000; // « Passer » : temps laissé pour confirmer
 const HISTORY_LIMIT = 300;
@@ -44,6 +45,7 @@ interface ActiveDialogue {
   timer: number | undefined; // écriture progressive
   autoTimer: number | undefined; // passage automatique à la réplique suivante
   skipTimer: number | undefined; // fin de la demande de confirmation de « Passer »
+  busy: boolean; // mise en scène en cours : le dialogue ne réagit à rien
   done: () => void;
 }
 
@@ -63,7 +65,15 @@ if (canvas === null) throw new Error('Canvas #game introuvable');
 
 const state = createChapter1();
 const ui = createUiState();
-const fx: Effects = { flashId: null, popup: null, dialogue: null, choice: null, history: null, showOutcome: false };
+const fx: Effects = {
+  flashId: null,
+  popup: null,
+  dialogue: null,
+  choice: null,
+  history: null,
+  showOutcome: false,
+  staging: false,
+};
 const renderer = createRenderer(canvas);
 let enemyPhaseRunning = false;
 let endHandled = false;
@@ -200,6 +210,30 @@ function endDialogue(active: ActiveDialogue): void {
   active.done();
 }
 
+// Mise en scène : le dialogue s'efface le temps de montrer l'action sur la carte, puis reprend.
+// Un déplacement est animé case par case ; une apparition ou un recrutement s'accompagne d'un éclair.
+function playStage(active: ActiveDialogue, step: StageStep): void {
+  active.busy = true;
+  fx.dialogue = null;
+  fx.staging = true;
+  draw();
+  const finish = (): void => {
+    fx.flashId = null;
+    fx.staging = false;
+    active.busy = false;
+    stepDialogue(active);
+  };
+  if (step.type === 'move') {
+    const unit = state.units.find((other) => other.id === step.unitId);
+    if (unit === undefined) finish();
+    else playMove(unit, step.path, finish);
+  } else {
+    fx.flashId = step.unitId;
+    draw();
+    window.setTimeout(finish, STAGE_BEAT_MS);
+  }
+}
+
 // Propose les réponses au joueur. La boîte de dialogue reste dessous (vide si le choix ouvre l'événement).
 function startChoice(choice: Choice): void {
   if (fx.dialogue === null) {
@@ -240,7 +274,8 @@ function stepDialogue(active: ActiveDialogue): void {
       continue;
     }
     if (step.type === 'line') startLine(active, step.line, active.runner.eventId);
-    else startChoice(step.choice);
+    else if (step.type === 'choice') startChoice(step.choice);
+    else playStage(active, step);
     return;
   }
 }
@@ -323,6 +358,7 @@ function closeHistory(active: ActiveDialogue): void {
 // Pendant un dialogue, la carte est inaccessible : seuls le texte, ses trois boutons, l'historique et, le cas
 // échéant, les réponses d'un choix réagissent. Un choix n'avance que par une réponse.
 function handleDialogueAction(active: ActiveDialogue, action: Action): void {
+  if (active.busy) return;
   const history = fx.history;
   if (history !== null) {
     if (action.type === 'setCursor') setCursor(state, ui, action.pos);
@@ -381,7 +417,15 @@ function playDialogues(events: ScriptEvent[], done: () => void): void {
     done();
     return;
   }
-  dialogue = { queue: [...events], runner: null, timer: undefined, autoTimer: undefined, skipTimer: undefined, done };
+  dialogue = {
+    queue: [...events],
+    runner: null,
+    timer: undefined,
+    autoTimer: undefined,
+    skipTimer: undefined,
+    busy: false,
+    done,
+  };
   stepDialogue(dialogue);
 }
 

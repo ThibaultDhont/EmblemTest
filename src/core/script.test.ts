@@ -210,6 +210,24 @@ test('les @choix mal formés sont refusés', () => {
   );
 });
 
+test('les commandes de mise en scène des unités sont reconnues', () => {
+  const [event] = parseScript(inEvent('@apparait e4 23 8', '@deplace e4 21 9', '@recrute rik'));
+  assert.deepEqual(event?.commands, [
+    { op: 'spawn', unit: 'e4', x: 23, y: 8 },
+    { op: 'move', unit: 'e4', x: 21, y: 9 },
+    { op: 'recruit', unit: 'rik' },
+  ]);
+});
+
+test('syntaxes invalides de la mise en scène des unités', () => {
+  assert.throws(() => parseScript(inEvent('@apparait e4 23')), /Ligne 2 : .*@apparait/);
+  assert.throws(() => parseScript(inEvent('@apparait E4 1 2')), /Ligne 2 : .*@apparait/);
+  assert.throws(() => parseScript(inEvent('@deplace e4 x 2')), /Ligne 2 : .*@deplace/);
+  assert.throws(() => parseScript(inEvent('@deplace e4 -1 2')), /Ligne 2 : .*@deplace/);
+  assert.throws(() => parseScript(inEvent('@recrute')), /Ligne 2 : .*@recrute/);
+  assert.throws(() => parseScript(inEvent('@recrute a b')), /Ligne 2 : .*@recrute/);
+});
+
 test('deux événements ne peuvent pas porter le même nom', () => {
   assert.throws(
     () => parseScript('@event a quand chapitre.debut\n@event a quand chapitre.victoire'),

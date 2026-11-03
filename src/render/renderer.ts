@@ -15,6 +15,7 @@ export interface Effects {
   choice: ChoiceView | null; // réponses proposées au joueur, par-dessus le dialogue
   history: HistoryView | null; // fenêtre d'historique, ouverte par-dessus un dialogue
   showOutcome: boolean; // l'écran de victoire ou de défaite apparaît après les dialogues de fin
+  staging: boolean; // mise en scène en cours : seuls la carte et les unités restent affichés
 }
 
 export interface Renderer {
@@ -63,8 +64,9 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
       }
 
       for (const unit of state.units) drawUnit(ctx, unit, fx.flashId === unit.id);
-      drawCursor(ctx, ui);
+      if (!fx.staging) drawCursor(ctx, ui);
       drawPopup(ctx, fx);
+      if (fx.staging) return;
 
       if (fx.dialogue !== null) {
         drawDialogue(ctx, fx.dialogue, ui.cursor);

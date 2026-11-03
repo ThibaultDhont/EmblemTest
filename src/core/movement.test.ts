@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { stateFromRows, tileIndex } from './grid.ts';
-import { costField, pathTo, reachableTiles } from './movement.ts';
+import { freeTileNear, stateFromRows, tileIndex } from './grid.ts';
+import { costField, pathTo, reachableTiles, scriptedPath } from './movement.ts';
 import { makeUnit } from './test-helpers.ts';
 import type { ClassId, GameState, Team, Unit } from './types.ts';
 
@@ -79,6 +79,50 @@ test('costField : coût du terrain pour rejoindre le but, sans traverser les mur
   assert.equal(field.get(tileIndex(state, { x: 1, y: 0 })), 1);
   assert.equal(field.get(tileIndex(state, { x: 3, y: 0 })), 4); // entre en forêt (2), plaine (1), but (1)
   assert.equal(field.get(tileIndex(state, { x: 3, y: 1 })), 5);
+});
+
+test('scriptedPath ignore le mouvement, le terrain et les unités', () => {
+  const mover = unit('a', 'player', 'swordsman', 0, 0); // mouvement 5
+  const far = stateFromRows(['..........'], [mover]);
+  const path = scriptedPath(far, { x: 0, y: 0 }, { x: 9, y: 0 });
+  assert.equal(path.length, 9);
+  assert.deepEqual(path[0], { x: 1, y: 0 });
+  assert.deepEqual(path.at(-1), { x: 9, y: 0 });
+
+  const rough = stateFromRows(['.mm.'], [mover, unit('e', 'enemy', 'lancer', 1, 0)]);
+  assert.equal(scriptedPath(rough, { x: 0, y: 0 }, { x: 3, y: 0 }).length, 3);
+});
+
+test('scriptedPath contourne les murs et renvoie [] si rien ne mène à la case', () => {
+  const mover = unit('a', 'player', 'swordsman', 0, 0);
+  const around = stateFromRows(['.#.', '...'], [mover]);
+  assert.deepEqual(scriptedPath(around, { x: 0, y: 0 }, { x: 2, y: 0 }), [
+    { x: 0, y: 1 },
+    { x: 1, y: 1 },
+    { x: 2, y: 1 },
+    { x: 2, y: 0 },
+  ]);
+
+  const enclosed = stateFromRows(['.#.'], [mover]);
+  assert.deepEqual(scriptedPath(enclosed, { x: 0, y: 0 }, { x: 2, y: 0 }), []);
+  assert.deepEqual(scriptedPath(around, { x: 0, y: 0 }, { x: 0, y: 0 }), []);
+});
+
+test('freeTileNear : la case demandée si elle est libre, sinon la plus proche', () => {
+  const blocker = unit('b', 'enemy', 'lancer', 1, 1);
+  const state = stateFromRows(['...', '...', '...'], [blocker]);
+  assert.deepEqual(freeTileNear(state, { x: 0, y: 0 }), { x: 0, y: 0 });
+  assert.deepEqual(freeTileNear(state, { x: 1, y: 1 }), { x: 1, y: 0 });
+  assert.deepEqual(freeTileNear(state, { x: 1, y: 1 }, blocker), { x: 1, y: 1 });
+});
+
+test('freeTileNear évite les murs, ramène une position hors carte et rend undefined si tout est pris', () => {
+  const state = stateFromRows(['#..', '...'], []);
+  assert.deepEqual(freeTileNear(state, { x: 0, y: 0 }), { x: 1, y: 0 });
+  assert.deepEqual(freeTileNear(state, { x: 9, y: 0 }), { x: 2, y: 0 });
+
+  const full = stateFromRows(['#.'], [unit('a', 'player', 'swordsman', 1, 0)]);
+  assert.equal(freeTileNear(full, { x: 0, y: 0 }), undefined);
 });
 
 test('un ennemi bloque le passage', () => {

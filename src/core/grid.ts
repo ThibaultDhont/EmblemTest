@@ -1,3 +1,4 @@
+import { TERRAINS } from '../data/terrains.ts';
 import type { GameState, Pos, TerrainId, Unit } from './types.ts';
 
 const LEGEND: Record<string, TerrainId> = {
@@ -8,7 +9,8 @@ const LEGEND: Record<string, TerrainId> = {
 };
 
 // Construit un état à partir d'une carte en texte (un caractère par tuile, voir LEGEND).
-export function stateFromRows(rows: string[], units: Unit[]): GameState {
+// `reserve` : les unités qui n'arriveront sur la carte que plus tard.
+export function stateFromRows(rows: string[], units: Unit[], reserve: Unit[] = []): GameState {
   const width = rows[0]?.length ?? 0;
   const tiles: TerrainId[] = [];
   for (const row of rows) {
@@ -21,7 +23,18 @@ export function stateFromRows(rows: string[], units: Unit[]): GameState {
       tiles.push(terrain);
     }
   }
-  return { width, height: rows.length, tiles, units, turn: 1, phase: 'player', outcome: 'playing', fired: [], flags: [] };
+  return {
+    width,
+    height: rows.length,
+    tiles,
+    units,
+    turn: 1,
+    phase: 'player',
+    outcome: 'playing',
+    fired: [],
+    flags: [],
+    reserve,
+  };
 }
 
 export function inBounds(state: GameState, pos: Pos): boolean {
@@ -48,4 +61,23 @@ export function terrainAt(state: GameState, pos: Pos): TerrainId {
 
 export function unitAt(state: GameState, pos: Pos): Unit | undefined {
   return state.units.find((unit) => unit.pos.x === pos.x && unit.pos.y === pos.y);
+}
+
+// Case libre la plus proche de `pos` (elle-même comprise) : ni mur, ni autre unité que `ignore`.
+// Une position hors de la carte est ramenée à la case la plus proche. Undefined si la carte est pleine.
+export function freeTileNear(state: GameState, pos: Pos, ignore?: Unit): Pos | undefined {
+  let best: Pos | undefined;
+  let bestGap = Infinity;
+  for (let index = 0; index < state.tiles.length; index++) {
+    const tile = posOf(state, index);
+    if (TERRAINS[terrainAt(state, tile)].moveCost === Infinity) continue;
+    const occupant = unitAt(state, tile);
+    if (occupant !== undefined && occupant !== ignore) continue;
+    const gap = distance(pos, tile);
+    if (gap < bestGap) {
+      best = tile;
+      bestGap = gap;
+    }
+  }
+  return best;
 }

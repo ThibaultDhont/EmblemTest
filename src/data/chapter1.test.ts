@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import { NARRATION } from '../core/dialogue.ts';
+import { inBounds, terrainAt } from '../core/grid.ts';
 import { parseScript } from '../core/script.ts';
 import type { Command, Condition } from '../core/script.ts';
 import { CHARACTERS } from './characters.ts';
@@ -70,8 +71,30 @@ test("chaque libellé d'option tient sur une ligne du panneau de choix", () => {
   assert.deepEqual(tooLong, []);
 });
 
+test('les commandes de mise en scène visent des unités du chapitre et des cases praticables', () => {
+  const chapter = createChapter1();
+  const known = new Set([...chapter.units, ...chapter.reserve].map((unit) => unit.id));
+  const reserve = new Set(chapter.reserve.map((unit) => unit.id));
+  for (const command of commands) {
+    if (command.op !== 'spawn' && command.op !== 'move' && command.op !== 'recruit') continue;
+    assert.ok(known.has(command.unit), `unité inconnue : ${command.unit}`);
+    if (command.op === 'spawn') assert.ok(reserve.has(command.unit), `${command.unit} n'est pas dans la réserve`);
+    if (command.op === 'recruit') continue;
+    const pos = { x: command.x, y: command.y };
+    assert.ok(inBounds(chapter, pos), `case hors de la carte : ${pos.x},${pos.y}`);
+    assert.notEqual(terrainAt(chapter, pos), 'wall', `case dans un mur : ${pos.x},${pos.y}`);
+  }
+});
+
+test('chaque unité de réserve est appelée par un @apparait', () => {
+  const spawned = new Set(commands.flatMap((command) => (command.op === 'spawn' ? [command.unit] : [])));
+  const forgotten = createChapter1().reserve.filter((unit) => !spawned.has(unit.id));
+  assert.deepEqual(forgotten.map((unit) => unit.id), []);
+});
+
 test('les unités citées par les déclencheurs et les conditions existent dans le chapitre', () => {
-  const ids = new Set(createChapter1().units.map((unit) => unit.id));
+  const chapter = createChapter1();
+  const ids = new Set([...chapter.units, ...chapter.reserve].map((unit) => unit.id));
   const cited = [
     ...events.flatMap((event) => (event.trigger.startsWith('mort(') ? [event.trigger.slice(5, -1)] : [])),
     ...conditions.flatMap(unitsIn),

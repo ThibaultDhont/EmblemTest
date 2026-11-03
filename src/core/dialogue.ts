@@ -1,3 +1,5 @@
+import { freeTileNear } from './grid.ts';
+import { scriptedPath } from './movement.ts';
 import type { ChoiceCommand, Command, ComparisonOp, Condition, ScriptEvent, Side, Trigger } from './script.ts';
 import type { GameState, Pos } from './types.ts';
 
@@ -23,7 +25,15 @@ export interface Choice {
   cast: Portrait[];
 }
 
-export type Step = { type: 'line'; line: Line } | { type: 'choice'; choice: Choice };
+// Une mise en scène que la présentation doit montrer sur la carte. Apparition et recrutement sont déjà
+// appliqués à l'état quand l'étape est rendue ; un déplacement ne l'est pas : la présentation fait avancer
+// l'unité le long de `path`, qui se termine à sa destination finale.
+export type StageStep =
+  | { type: 'move'; unitId: string; path: Pos[] }
+  | { type: 'spawn'; unitId: string }
+  | { type: 'recruit'; unitId: string };
+
+export type Step = { type: 'line'; line: Line } | { type: 'choice'; choice: Choice } | StageStep;
 
 // Une liste de commandes en cours de lecture : l'événement lui-même, puis chaque branche @si ou @option entrée.
 interface Frame {
@@ -74,6 +84,29 @@ export function nextStep(runner: DialogueRunner, state: GameState): Step | null 
       case 'choice':
         runner.pending = command;
         return { type: 'choice', choice: choiceOf(runner, command) };
+      case 'spawn': {
+        const unit = state.reserve.find((candidate) => candidate.id === command.unit);
+        const pos = freeTileNear(state, { x: command.x, y: command.y });
+        if (unit === undefined || pos === undefined) break; // inconnue ou déjà arrivée : rien à montrer
+        state.reserve = state.reserve.filter((candidate) => candidate !== unit);
+        unit.pos = pos;
+        state.units.push(unit);
+        return { type: 'spawn', unitId: unit.id };
+      }
+      case 'move': {
+        const unit = state.units.find((candidate) => candidate.id === command.unit);
+        const target = unit === undefined ? undefined : freeTileNear(state, { x: command.x, y: command.y }, unit);
+        const path = unit === undefined || target === undefined ? [] : scriptedPath(state, unit.pos, target);
+        if (unit === undefined || path.length === 0) break;
+        return { type: 'move', unitId: unit.id, path };
+      }
+      case 'recruit': {
+        const unit = state.units.find((candidate) => candidate.id === command.unit && candidate.team === 'enemy');
+        if (unit === undefined) break;
+        unit.team = 'player';
+        unit.ai = undefined;
+        return { type: 'recruit', unitId: unit.id };
+      }
     }
   }
   return null;
@@ -94,20 +127,30 @@ export function choose(runner: DialogueRunner, index: number): string | undefine
 }
 
 // Passe le reste de l'événement sans l'afficher, jusqu'au prochain choix : les commandes (drapeaux,
-// portraits) sont appliquées pour que la suite de la partie soit la même, mais on ne choisit jamais à la
-// place du joueur. Renvoie les répliques sautées.
+// portraits, apparitions, déplacements, recrutements) sont appliquées d'un coup pour que la suite de la
+// partie soit la même, mais on ne choisit jamais à la place du joueur. Renvoie les répliques sautées.
 export function skipRest(runner: DialogueRunner, state: GameState): Line[] {
   const skipped: Line[] = [];
-  for (let step = nextStep(runner, state); step?.type === 'line'; step = nextStep(runner, state)) skipped.push(step.line);
+  for (let step = nextStep(runner, state); step !== null && step.type !== 'choice'; step = nextStep(runner, state)) {
+    if (step.type === 'line') skipped.push(step.line);
+    else if (step.type === 'move') settleMove(state, step);
+  }
   return skipped;
+}
+
+// Place l'unité à l'arrivée de son déplacement, sans l'animer.
+function settleMove(state: GameState, step: Extract<StageStep, { type: 'move' }>): void {
+  const unit = state.units.find((candidate) => candidate.id === step.unitId);
+  const end = step.path.at(-1);
+  if (unit !== undefined && end !== undefined) unit.pos = end;
 }
 
 export function holds(condition: Condition, state: GameState): boolean {
   switch (condition.type) {
     case 'alive':
       return state.units.some((unit) => unit.id === condition.unit);
-    case 'dead':
-      return !state.units.some((unit) => unit.id === condition.unit);
+    case 'dead': // ni sur la carte, ni en réserve : une unité qui n'est pas encore arrivée n'est pas morte
+      return !state.units.some((unit) => unit.id === condition.unit) && !state.reserve.some((unit) => unit.id === condition.unit);
     case 'flag':
       return state.flags.includes(condition.name);
     case 'turn':

@@ -31,7 +31,10 @@ export type Command =
   | { op: 'hide'; who: string } // @cache perso
   | { op: 'flag'; name: string; value: boolean } // @drapeau nom (vrai), @efface nom (faux)
   | { op: 'if'; condition: Condition; then: Command[]; otherwise: Command[] } // @si … @sinon … @fin
-  | { op: 'choice'; options: ChoiceOption[] }; // @choix, puis des @option … @fin
+  | { op: 'choice'; options: ChoiceOption[] } // @choix, puis des @option … @fin
+  | { op: 'spawn'; unit: string; x: number; y: number } // @apparait id x y : une unité de la réserve arrive
+  | { op: 'move'; unit: string; x: number; y: number } // @deplace id x y : déplacement de mise en scène
+  | { op: 'recruit'; unit: string }; // @recrute id : une unité ennemie passe dans le camp du joueur
 
 export type ChoiceCommand = Extract<Command, { op: 'choice' }>;
 
@@ -60,6 +63,7 @@ const TRIGGER = new RegExp(
 const TEST = new RegExp(`^(vivant|mort|drapeau)\\((${NAME})\\)$`);
 const SAY = /^([a-z][a-z0-9-]*)\s*:\s*([A-Za-z0-9][\w.-]*)$/;
 const KEY = /^[A-Za-z0-9][\w.-]*$/;
+const INTEGER = /^\d+$/;
 const SIDES: readonly string[] = ['gauche', 'droite'];
 const OPERATORS: readonly string[] = ['==', '>=', '<=', '>', '<'];
 
@@ -153,6 +157,20 @@ function parseCommand(line: string, words: string[], lineNumber: number, blocks:
         throw new ScriptError(lineNumber, `syntaxe attendue « ${name} <nom> » (minuscules, chiffres et tirets)`);
       }
       return { op: 'flag', name: who, value: name === '@drapeau' };
+    case '@apparait':
+    case '@deplace': {
+      const x = words[2];
+      const y = words[3];
+      if (words.length !== 4 || who === undefined || !NAME_ONLY.test(who) || x === undefined || y === undefined || !INTEGER.test(x) || !INTEGER.test(y)) {
+        throw new ScriptError(lineNumber, `syntaxe attendue « ${name} <unité> <x> <y> » (cases de la carte, à partir de 0)`);
+      }
+      return { op: name === '@apparait' ? 'spawn' : 'move', unit: who, x: Number(x), y: Number(y) };
+    }
+    case '@recrute':
+      if (words.length !== 2 || who === undefined || !NAME_ONLY.test(who)) {
+        throw new ScriptError(lineNumber, 'syntaxe attendue « @recrute <unité> »');
+      }
+      return { op: 'recruit', unit: who };
     case '@si':
       return { op: 'if', condition: parseCondition(words.slice(1), lineNumber), then: [], otherwise: [] };
     case '@sinon': {

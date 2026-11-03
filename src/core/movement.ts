@@ -75,6 +75,32 @@ export function pathTo(state: GameState, unit: Unit, destination: Pos): Pos[] {
   return path.reverse();
 }
 
+// Chemin de mise en scène entre deux cases, le plus court en nombre de pas : on ne tient compte ni du
+// mouvement de l'unité, ni du coût du terrain, ni des autres unités ; seuls les murs barrent la route.
+// Départ exclu ; vide si les deux cases sont les mêmes ou si l'arrivée est inaccessible.
+export function scriptedPath(state: GameState, from: Pos, to: Pos): Pos[] {
+  const start = tileIndex(state, from);
+  const goal = tileIndex(state, to);
+  const previous = new Map<number, number>([[start, start]]);
+  const queue = [start];
+  for (let current = queue.shift(); current !== undefined && current !== goal; current = queue.shift()) {
+    const here = posOf(state, current);
+    for (const direction of DIRECTIONS) {
+      const next = { x: here.x + direction.x, y: here.y + direction.y };
+      if (!inBounds(state, next) || TERRAINS[terrainAt(state, next)].moveCost === Infinity) continue;
+      const index = tileIndex(state, next);
+      if (previous.has(index)) continue;
+      previous.set(index, current);
+      queue.push(index);
+    }
+  }
+
+  const path: Pos[] = [];
+  if (goal === start || !previous.has(goal)) return path;
+  for (let index = goal; index !== start; index = previous.get(index) ?? start) path.push(posOf(state, index));
+  return path.reverse();
+}
+
 // Coût minimal pour rejoindre `goal` depuis chaque case, d'après le seul terrain (unités ignorées).
 // Sert à choisir dans quelle direction avancer quand personne n'est à portée.
 export function costField(state: GameState, goal: Pos): Map<number, number> {
