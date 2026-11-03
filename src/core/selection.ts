@@ -24,7 +24,9 @@ export type Mode = 'idle' | 'move' | 'menu' | 'target' | 'busy' | 'system';
 
 // État de l'interface, hors GameState.
 export interface UiState {
-  cursor: Pos;
+  cursor: Pos; // case de la carte visée
+  pointer: Pos; // case de l'écran sous le pointeur : elle sert aux boutons et aux choix des dialogues
+  camera: Pos; // case de la carte affichée en haut à gauche de la vue
   mode: Mode;
   selectedId: string | null;
   origin: Pos | null; // position de l'unité avant son déplacement, pour annuler
@@ -45,6 +47,8 @@ export type Playback =
 export function createUiState(events: ScriptEvent[] = []): UiState {
   return {
     cursor: { x: 0, y: 0 },
+    pointer: { x: 0, y: 0 },
+    camera: { x: 0, y: 0 },
     mode: 'idle',
     selectedId: null,
     origin: null,

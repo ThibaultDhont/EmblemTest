@@ -81,7 +81,7 @@
 @event renforts quand tour.ennemi(3)
   @montre anna gauche
   anna: ch1.renforts.1
-  @apparait e4 23 8
+  @apparait e4 31 8
   @deplace e4 21 9
   anna: ch1.renforts.2
   # Le nouvel objectif remplace « vaincre le boss » et dépend du choix du début :

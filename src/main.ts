@@ -1,4 +1,5 @@
 import { planEnemyAction } from './core/ai.ts';
+import { centerOn, panBy, revealRect, revealTile, toMapTile } from './core/camera.ts';
 import { applyEvent, resolveCombat } from './core/combat.ts';
 import type { CombatEvent } from './core/combat.ts';
 import {
@@ -16,7 +17,7 @@ import {
 import type { Choice, DialogueRunner, Line, StageStep } from './core/dialogue.ts';
 import type { ScriptEvent, Trigger } from './core/script.ts';
 import { updateOutcome } from './core/objective.ts';
-import { cancel, confirm, createUiState, finishAction, finishMove, resetUi, setCursor } from './core/selection.ts';
+import { MENU_WIDTH, cancel, confirm, createUiState, finishAction, finishMove, resetUi, setCursor } from './core/selection.ts';
 import type { Playback } from './core/selection.ts';
 import { arrivalTriggers, attackTrigger, selectionTrigger, talkTrigger } from './core/triggers.ts';
 import { endEnemyPhase } from './core/turn.ts';
@@ -69,6 +70,8 @@ if (canvas === null) throw new Error('Canvas #game introuvable');
 
 const state = createChapter1();
 const ui = createUiState(CHAPTER1_EVENTS);
+const lord = state.units.find((unit) => unit.role === 'lord');
+ui.camera = centerOn(state, lord?.pos ?? { x: 0, y: 0 });
 const fx: Effects = {
   flashId: null,
   popup: null,
@@ -88,6 +91,43 @@ const log: LogEntry[] = [];
 const pendingDeaths: string[] = []; // unités tombées dont le dialogue de mort n'a pas encore été joué
 
 const draw = (): void => renderer.draw(state, ui, fx);
+
+// La case de la carte visée suit le pointeur : elle change avec lui, et aussi quand la caméra bouge sous lui.
+function pointTo(pos: Pos): void {
+  ui.pointer = pos;
+  setCursor(state, ui, toMapTile(ui.camera, pos));
+}
+
+function moveCamera(camera: Pos): boolean {
+  if (camera.x === ui.camera.x && camera.y === ui.camera.y) return false;
+  ui.camera = camera;
+  setCursor(state, ui, toMapTile(camera, ui.pointer));
+  return true;
+}
+
+// La caméra suit l'action : elle ne bouge que lorsque la case approche du bord de la vue.
+function follow(pos: Pos): void {
+  moveCamera(revealTile(state, ui.camera, pos));
+}
+
+// Un menu qui vient de s'ouvrir doit tenir entièrement dans la vue, avec l'unité qui est à côté.
+function revealMenu(): void {
+  const menu = ui.menu;
+  if (menu === null) return;
+  moveCamera(revealRect(state, ui.camera, { x: menu.x, y: menu.y, width: MENU_WIDTH, height: menu.items.length }, 1));
+}
+
+// Défilement voulu par le joueur (molette, bord de l'écran) : seulement quand c'est à lui de jouer.
+const canPan = (): boolean => state.phase === 'player' && state.outcome === 'playing' && ui.mode !== 'busy';
+
+function panCamera(dx: number, dy: number): boolean {
+  return canPan() && moveCamera(panBy(state, ui.camera, dx, dy));
+}
+
+// Un pointeur posé au bord pour un dialogue (le bouton « Passer » est sur la rangée du haut) ou resté là pendant la
+// phase ennemie ne doit pas faire défiler la carte à la reprise : le défilement du bord ne repart qu'après un
+// mouvement du pointeur pendant que la carte est jouable.
+let edgeArmed = true;
 
 function showEvent(event: CombatEvent): void {
   applyEvent(state, event);
@@ -136,6 +176,7 @@ function playMove(unit: Unit, path: Pos[], done: () => void): void {
       return;
     }
     unit.pos = pos;
+    follow(pos);
     draw();
     setTimeout(step, MOVE_STEP_MS);
   };
@@ -246,6 +287,8 @@ function playStage(active: ActiveDialogue, step: StageStep): void {
   } else if (step.type === 'objective') {
     showBanner('objective.new', finish);
   } else {
+    const unit = state.units.find((other) => other.id === step.unitId);
+    if (unit !== undefined) follow(unit.pos);
     fx.flashId = step.unitId;
     draw();
     window.setTimeout(finish, STAGE_BEAT_MS);
@@ -376,14 +419,15 @@ function closeHistory(active: ActiveDialogue): void {
 // Pendant un dialogue, la carte est inaccessible : seuls le texte, ses trois boutons, l'historique et, le cas
 // échéant, les réponses d'un choix réagissent. Un choix n'avance que par une réponse.
 function handleDialogueAction(active: ActiveDialogue, action: Action): void {
+  if (action.type === 'pan' || action.type === 'pointer') edgeArmed = false;
   if (active.busy) return;
   const history = fx.history;
   if (history !== null) {
-    if (action.type === 'setCursor') setCursor(state, ui, action.pos);
+    if (action.type === 'pointer') pointTo(action.pos);
     else if (action.type === 'scroll') history.offset -= action.lines;
     else if (action.type === 'cancel') closeHistory(active);
-    else {
-      const arrow = historyButtonAt(ui.cursor);
+    else if (action.type === 'confirm') {
+      const arrow = historyButtonAt(ui.pointer);
       if (arrow === 'up') history.offset += HISTORY_PAGE;
       else if (arrow === 'down') history.offset -= HISTORY_PAGE;
       else closeHistory(active);
@@ -394,26 +438,26 @@ function handleDialogueAction(active: ActiveDialogue, action: Action): void {
 
   const choice = fx.choice;
   if (choice !== null) {
-    if (action.type === 'setCursor') {
-      setCursor(state, ui, action.pos);
+    if (action.type === 'pointer') {
+      pointTo(action.pos);
     } else if (action.type === 'cancel') {
       openHistory(active);
     } else if (action.type === 'confirm') {
-      const index = choiceOptionAt(ui.cursor, choice.options.length);
+      const index = choiceOptionAt(ui.pointer, choice.options.length);
       if (index !== undefined) pick(active, index);
-      else if (dialogueButtonAt(ui.cursor) === 'history') openHistory(active);
+      else if (dialogueButtonAt(ui.pointer) === 'history') openHistory(active);
     }
     draw();
     return;
   }
 
   switch (action.type) {
-    case 'setCursor':
-      setCursor(state, ui, action.pos);
+    case 'pointer':
+      pointTo(action.pos);
       draw();
       break;
     case 'confirm': {
-      const button = dialogueButtonAt(ui.cursor);
+      const button = dialogueButtonAt(ui.pointer);
       if (button !== 'skip') cancelSkip(active);
       if (button === 'auto') toggleAuto(active);
       else if (button === 'history') openHistory(active);
@@ -426,6 +470,7 @@ function handleDialogueAction(active: ActiveDialogue, action: Action): void {
       openHistory(active);
       break;
     case 'scroll':
+    case 'pan':
       break;
   }
 }
@@ -507,6 +552,8 @@ function playEnemies(): void {
     }
 
     const action = planEnemyAction(state, unit);
+    // Un ennemi qui attaque sans bouger est suivi aussi ; un ennemi qui ne fait rien ne déplace pas la caméra.
+    if (action.path.length === 0 && action.targetId !== undefined) follow(unit.pos);
     playMove(unit, action.path, () => {
       const target = state.units.find((other) => other.id === action.targetId);
       if (target === undefined) {
@@ -544,6 +591,7 @@ function play(playback: Playback | null): void {
           return;
         }
         finishMove(state, ui);
+        revealMenu();
         draw();
       });
     });
@@ -579,8 +627,9 @@ function dispatch(action: Action): void {
     return;
   }
   switch (action.type) {
-    case 'setCursor':
-      setCursor(state, ui, action.pos);
+    case 'pointer':
+      edgeArmed = true;
+      pointTo(action.pos);
       break;
     case 'confirm':
       if (state.outcome !== 'playing') {
@@ -590,15 +639,22 @@ function dispatch(action: Action): void {
       {
         const selectedBefore = ui.selectedId;
         play(confirm(state, ui, Math.random));
+        revealMenu();
         // Sélectionner une unité peut déclencher un dialogue ; la zone de déplacement reste affichée dessous.
         if (ui.selectedId !== null && ui.selectedId !== selectedBefore) playTriggers([selectionTrigger(ui.selectedId)], draw);
       }
       break;
     case 'cancel':
       cancel(state, ui);
+      revealMenu();
       break;
     case 'scroll':
-      return;
+      if (!panCamera(Math.sign(action.columns), Math.sign(action.lines))) return;
+      break;
+    case 'pan':
+      if (!canPan()) edgeArmed = false;
+      if (!edgeArmed || !panCamera(action.dx, action.dy)) return;
+      break;
   }
   draw();
   advance();

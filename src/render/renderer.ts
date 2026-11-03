@@ -25,6 +25,8 @@ export interface Renderer {
   draw(state: GameState, ui: UiState, fx: Effects): void;
 }
 
+const BACKGROUND = '#10131c'; // même couleur que la page, pour que le bord d'une petite carte se fonde dans le cadre
+
 // Placeholders : rectangles pleins uniquement, pour rester nets une fois agrandis.
 const TEAM_COLOR: Record<Team, string> = { player: '#2b59c3', enemy: '#c33b2b' };
 const CLASS_MARK: Record<ClassId, string> = {
@@ -55,6 +57,12 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
 
   return {
     draw(state, ui, fx) {
+      // Fond hors de la carte (visible quand elle est plus petite que la vue), puis la carte décalée par la caméra.
+      ctx.fillStyle = BACKGROUND;
+      ctx.fillRect(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT);
+      ctx.save();
+      ctx.translate(-ui.camera.x * TILE_SIZE, -ui.camera.y * TILE_SIZE);
+
       for (let index = 0; index < state.tiles.length; index++) {
         const pos = posOf(state, index);
         drawTerrain(ctx, state.tiles[index] ?? 'plain', pos.x * TILE_SIZE, pos.y * TILE_SIZE);
@@ -76,13 +84,15 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
 
       for (const unit of state.units) drawUnit(ctx, unit, fx.flashId === unit.id);
       if (!fx.staging) drawCursor(ctx, ui);
-      drawPopup(ctx, fx);
+      drawPopup(ctx, fx, ui.camera);
+      ctx.restore();
+
       if (fx.banner !== null) drawBanner(ctx, fx.banner);
       if (fx.staging) return;
 
       if (fx.dialogue !== null) {
-        drawDialogue(ctx, fx.dialogue, ui.cursor);
-        if (fx.choice !== null) drawChoice(ctx, fx.choice, fx.dialogue, ui.cursor);
+        drawDialogue(ctx, fx.dialogue, ui.pointer);
+        if (fx.choice !== null) drawChoice(ctx, fx.choice, fx.dialogue, ui.pointer);
         if (fx.history !== null) drawHistory(ctx, fx.history);
         return;
       }
@@ -203,12 +213,12 @@ function drawCursor(ctx: CanvasRenderingContext2D, ui: UiState): void {
   ctx.fillRect(x + TILE_SIZE - 1, y, 1, TILE_SIZE);
 }
 
-// Dégâts au-dessus de la case (en dessous sur la première ligne, faute de place).
-function drawPopup(ctx: CanvasRenderingContext2D, fx: Effects): void {
+// Dégâts au-dessus de la case (en dessous sur la première ligne de la vue, faute de place).
+function drawPopup(ctx: CanvasRenderingContext2D, fx: Effects, camera: Pos): void {
   if (fx.popup === null) return;
   const x = fx.popup.pos.x * TILE_SIZE + TILE_SIZE / 2;
   const top = fx.popup.pos.y * TILE_SIZE;
-  const y = top >= TILE_SIZE ? top : top + TILE_SIZE + 10;
+  const y = top - camera.y * TILE_SIZE >= TILE_SIZE ? top : top + TILE_SIZE + 10;
   ctx.font = 'bold 8px monospace';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'bottom';

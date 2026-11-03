@@ -45,7 +45,7 @@ export function drawInfoPanel(ctx: CanvasRenderingContext2D, state: GameState, u
   setText(ctx);
   const width = textWidth(ctx, lines) + 8;
   const height = lines.length * 10 + 4;
-  const x = ui.cursor.x < VIEW_COLS / 2 ? SCREEN_WIDTH - width - 4 : 4;
+  const x = ui.cursor.x - ui.camera.x < VIEW_COLS / 2 ? SCREEN_WIDTH - width - 4 : 4;
   const y = 4;
   drawBox(ctx, x, y, width, height);
   ctx.fillStyle = '#ffffff';
@@ -54,8 +54,8 @@ export function drawInfoPanel(ctx: CanvasRenderingContext2D, state: GameState, u
 
 // Une entrée = une tuile de haut, pour que la souris puisse la viser case par case.
 export function drawMenu(ctx: CanvasRenderingContext2D, ui: UiState, menu: Menu): void {
-  const x = menu.x * TILE_SIZE;
-  const y = menu.y * TILE_SIZE;
+  const x = (menu.x - ui.camera.x) * TILE_SIZE;
+  const y = (menu.y - ui.camera.y) * TILE_SIZE;
   const width = MENU_WIDTH * TILE_SIZE;
   drawBox(ctx, x, y, width, menu.items.length * TILE_SIZE);
   setText(ctx);
@@ -94,7 +94,7 @@ export function drawForecast(ctx: CanvasRenderingContext2D, state: GameState, ui
 
   const width = 4 + LABEL_WIDTH + 2 * COLUMN_WIDTH;
   const height = rows.length * 10 + 4;
-  const x = ui.cursor.x < VIEW_COLS / 2 ? SCREEN_WIDTH - width - 4 : 4;
+  const x = ui.cursor.x - ui.camera.x < VIEW_COLS / 2 ? SCREEN_WIDTH - width - 4 : 4;
   const y = SCREEN_HEIGHT - height - 4;
   drawBox(ctx, x, y, width, height);
   setText(ctx);

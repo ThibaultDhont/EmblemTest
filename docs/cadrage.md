@@ -1,6 +1,6 @@
 # Cadrage du projet
 
-Document de référence des décisions de conception. Dernière mise à jour : 2026-11-03, après la revue complète des thèmes (jalons 1 à 3 et étapes 4a à 4i terminés).
+Document de référence des décisions de conception. Dernière mise à jour : 2026-11-03, après la revue complète des thèmes (jalons 1 à 3 et étapes 4a à 4i et 5a terminés).
 
 Ce document remplace les choix précédents quand ils diffèrent (voir « Changements par rapport au départ »).
 
@@ -122,7 +122,9 @@ Ce document remplace les choix précédents quand ils diffèrent (voir « Change
    - **4g (fait)** : déclencheurs d'actions du joueur : `selection(id)` (sélection d'une unité, utile au tutoriel), `attaque(id)` (avant le combat), `case(x,y)` et `case(id,x,y)` (arrivée sur une case après un déplacement).
    - **4h (fait)** : commande « Parler » : une entrée de menu apparaît quand une unité est voisine d'une autre pour qui le script prévoit un événement `parler(a,b)` non joué. Un seul interlocuteur : la conversation se lance ; plusieurs : on désigne lequel (surbrillance verte). Elle termine l'action de l'unité et peut recruter (`@recrute`). Les soutiens avec bonus de combat restent à faire.
    - **4i (fait)** : objectifs « atteindre une case » (`atteindre x y` : une unité du joueur sur la case suffit) et « escorter » (`escorte unité x y` : seule l'unité désignée gagne en arrivant, et sa mort fait perdre). La case visée est marquée sur la carte (voile jaune et coins) et le HUD l'annonce. La victoire se déclenche dès l'arrivée, sans attendre la fin de l'action de l'unité. Dans le chapitre 1, la voie prudente bascule en escorte de Marc (ou en « atteindre » si Marc est mort) vers la case (1,14), la voie audacieuse reste en « survie 4 ». Limite connue : `@recrute` et `@objectif` ne réévaluent pas la victoire sur le champ (elle l'est après une mort, à la fin de la phase ennemie et à l'arrivée d'une unité du joueur). Le jalon 4 est terminé ; la narration entre les chapitres relève de l'étape 6.
-2. Caméra et défilement, entrées tactiles.
+2. Caméra et défilement, entrées tactiles, découpés en deux étapes :
+   - **5a (fait)** : caméra en tuiles entières, bornée à la carte (une carte plus petite que la vue est centrée). À la souris, le pointeur resté sur la rangée de bord de l'écran fait défiler d'une tuile toutes les 150 ms, la molette défile aussi (verticalement, horizontalement avec un pavé tactile). Le défilement du bord ne repart qu'après un mouvement du pointeur quand un dialogue ou la phase ennemie l'a interrompu. La caméra suit l'action : curseur, menu d'actions (toujours entièrement visible), ennemis qui bougent ou attaquent, mise en scène des dialogues. `ui.cursor` reste la case de la carte, `ui.pointer` est la case de l'écran (boutons et choix des dialogues). Le chapitre 1 passe à 32×20 (terrain ajouté à droite et en bas) et son renfort entre par le bord est en (31,8). Sauts instantanés : le défilement animé et un repère pour une case d'objectif hors écran restent possibles plus tard.
+   - 5b : entrées tactiles (glisser pour défiler, toucher pour valider, bouton « Retour » à la place du clic droit, échelle sur mobile).
 3. Sauvegarde, écran titre et menus, options (dont la vitesse du texte des dialogues).
 4. Progression : XP, croissances, promotion.
 5. Combat étendu : magie, soins, cavaliers, volants, durabilité et rangs.
@@ -130,8 +132,8 @@ Ce document remplace les choix précédents quand ils diffèrent (voir « Change
 7. Art, écran de combat dédié, audio.
 8. Tranche verticale : un chapitre complet, puis quelques chapitres pour les premiers tests.
 
-## État actuel du code (jalons 1 à 3 et étapes 4a à 4i)
+## État actuel du code (jalons 1 à 3 et étapes 4a à 4i et 5a)
 
-**Fait** : grille et déplacement avec coût de terrain, combat (triangle physique, double attaque, riposte selon la portée, critique, 2RN), mort définitive, phases joueur et ennemie, IA à trois profils, seigneur et boss avec écran de fin, objectifs de chapitre (boss, déroute, survie, atteindre une case, escorter) affichés dans le HUD, avec la case visée marquée sur la carte, et annoncés par une bannière, déplacements animés, i18n fr/en, script de dialogues (format texte, analyseur, interpréteur avec blocs @si et drapeaux), dialogues avec portraits provisoires et texte progressif (mode Auto, passer avec confirmation, historique, choix du joueur, mise en scène des unités), déclencheurs de début et de fin de chapitre, de début de tour, de mort d'une unité et d'actions du joueur (sélection, attaque, arrivée sur une case), commande « Parler » avec recrutement par la parole, tests.
+**Fait** : grille et déplacement avec coût de terrain, combat (triangle physique, double attaque, riposte selon la portée, critique, 2RN), mort définitive, phases joueur et ennemie, IA à trois profils, seigneur et boss avec écran de fin, objectifs de chapitre (boss, déroute, survie, atteindre une case, escorter) affichés dans le HUD, avec la case visée marquée sur la carte, et annoncés par une bannière, déplacements animés, i18n fr/en, script de dialogues (format texte, analyseur, interpréteur avec blocs @si et drapeaux), dialogues avec portraits provisoires et texte progressif (mode Auto, passer avec confirmation, historique, choix du joueur, mise en scène des unités), déclencheurs de début et de fin de chapitre, de début de tour, de mort d'une unité et d'actions du joueur (sélection, attaque, arrivée sur une case), commande « Parler » avec recrutement par la parole, caméra et défilement à la souris (bords de l'écran, molette) sur des cartes plus grandes que la vue, tests.
 
-**Pas encore fait** : tout ce qui n'est pas listé ci-dessus, en particulier la narration entre les niveaux, la caméra, la sauvegarde, la progression, la magie, l'inventaire et les vrais assets.
+**Pas encore fait** : tout ce qui n'est pas listé ci-dessus, en particulier la narration entre les niveaux, les entrées tactiles, la sauvegarde, la progression, la magie, l'inventaire et les vrais assets.
