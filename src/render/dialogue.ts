@@ -1,5 +1,5 @@
 import { SCREEN_HEIGHT, SCREEN_WIDTH } from '../config.ts';
-import type { Portrait } from '../core/scene.ts';
+import type { Portrait } from '../core/dialogue.ts';
 import { CHARACTERS } from '../data/characters.ts';
 import { drawBox, setText } from './panels.ts';
 

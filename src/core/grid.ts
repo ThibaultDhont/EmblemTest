@@ -21,7 +21,7 @@ export function stateFromRows(rows: string[], units: Unit[]): GameState {
       tiles.push(terrain);
     }
   }
-  return { width, height: rows.length, tiles, units, turn: 1, phase: 'player', outcome: 'playing', fired: [] };
+  return { width, height: rows.length, tiles, units, turn: 1, phase: 'player', outcome: 'playing', fired: [], flags: [] };
 }
 
 export function inBounds(state: GameState, pos: Pos): boolean {

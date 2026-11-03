@@ -1,14 +1,15 @@
 import { planEnemyAction } from './core/ai.ts';
 import { applyEvent, resolveCombat } from './core/combat.ts';
 import type { CombatEvent } from './core/combat.ts';
-import { NARRATION, nextLine, startScene, takeEvents } from './core/scene.ts';
-import type { Line, SceneRunner } from './core/scene.ts';
-import type { ScriptEvent } from './core/script.ts';
+import { NARRATION, nextLine, startDialogue, takeEvents } from './core/dialogue.ts';
+import type { DialogueRunner, Line } from './core/dialogue.ts';
+import type { ScriptEvent, Trigger } from './core/script.ts';
 import { cancel, confirm, createUiState, finishAction, finishMove, resetUi, setCursor } from './core/selection.ts';
 import type { Playback } from './core/selection.ts';
 import { endEnemyPhase } from './core/turn.ts';
 import type { Pos, Unit } from './core/types.ts';
-import { CHAPTER1_EVENTS, createChapter1 } from './data/chapter1.ts';
+import { CHAPTER1_EVENTS } from './data/chapter1.events.ts';
+import { createChapter1 } from './data/chapter1.ts';
 import { detectLanguage, setLanguage, storyText, t } from './i18n/index.ts';
 import type { Action } from './input/actions.ts';
 import { attachMouse } from './input/mouse.ts';
@@ -20,10 +21,10 @@ const COMBAT_STEP_MS = 600;
 const ENEMY_PAUSE_MS = 350;
 const TEXT_STEP_MS = 25;
 
-// Scène de dialogue en cours : les événements restant à jouer et le texte en train de s'écrire.
-interface ActiveScene {
+// Dialogues en cours : les événements restant à jouer et le texte en train de s'écrire.
+interface ActiveDialogue {
   queue: ScriptEvent[];
-  runner: SceneRunner | null;
+  runner: DialogueRunner | null;
   timer: number | undefined;
   done: () => void;
 }
@@ -41,7 +42,8 @@ const fx: Effects = { flashId: null, popup: null, dialogue: null, showOutcome: f
 const renderer = createRenderer(canvas);
 let enemyPhaseRunning = false;
 let endHandled = false;
-let scene: ActiveScene | null = null;
+let dialogue: ActiveDialogue | null = null;
+const pendingDeaths: string[] = []; // unités tombées dont le dialogue de mort n'a pas encore été joué
 
 const draw = (): void => renderer.draw(state, ui, fx);
 
@@ -49,7 +51,10 @@ function showEvent(event: CombatEvent): void {
   applyEvent(state, event);
   fx.flashId = null;
   fx.popup = null;
-  if (event.type !== 'strike') return;
+  if (event.type === 'death') {
+    pendingDeaths.push(event.unitId);
+    return;
+  }
 
   const target = state.units.find((unit) => unit.id === event.targetId);
   if (target === undefined) return;
@@ -96,7 +101,7 @@ function playMove(unit: Unit, path: Pos[], done: () => void): void {
 }
 
 // Affiche une réplique, dont le texte s'écrit lettre par lettre.
-function startLine(active: ActiveScene, line: Line): void {
+function startLine(active: ActiveDialogue, line: Line): void {
   const text = storyText(line.key);
   const view = {
     speaker: line.speaker,
@@ -115,25 +120,25 @@ function startLine(active: ActiveScene, line: Line): void {
   draw();
 }
 
-function endScene(active: ActiveScene): void {
+function endDialogue(active: ActiveDialogue): void {
   fx.dialogue = null;
-  scene = null;
+  dialogue = null;
   draw();
   active.done();
 }
 
-// Passe à la réplique suivante, d'un événement ou du suivant ; termine la scène s'il n'en reste plus.
-function stepScene(active: ActiveScene): void {
+// Passe à la réplique suivante, d'un événement ou du suivant ; termine si plus rien ne reste.
+function stepDialogue(active: ActiveDialogue): void {
   for (;;) {
     if (active.runner === null) {
       const event = active.queue.shift();
       if (event === undefined) {
-        endScene(active);
+        endDialogue(active);
         return;
       }
-      active.runner = startScene(event);
+      active.runner = startDialogue(event);
     }
-    const line = nextLine(active.runner);
+    const line = nextLine(active.runner, state);
     if (line === null) {
       active.runner = null;
       continue;
@@ -144,43 +149,62 @@ function stepScene(active: ActiveScene): void {
 }
 
 // Un clic affiche d'abord toute la réplique, puis passe à la suivante.
-function advanceScene(): void {
+function advanceDialogue(): void {
   const view = fx.dialogue;
-  if (scene === null || view === null) return;
+  if (dialogue === null || view === null) return;
   if (view.revealed < view.text.length) {
-    window.clearTimeout(scene.timer);
-    scene.timer = undefined;
+    window.clearTimeout(dialogue.timer);
+    dialogue.timer = undefined;
     view.revealed = view.text.length;
     draw();
   } else {
-    stepScene(scene);
+    stepDialogue(dialogue);
   }
 }
 
-function playScenes(events: ScriptEvent[], done: () => void): void {
+function playDialogues(events: ScriptEvent[], done: () => void): void {
   if (events.length === 0) {
     done();
     return;
   }
-  scene = { queue: [...events], runner: null, timer: undefined, done };
-  stepScene(scene);
+  dialogue = { queue: [...events], runner: null, timer: undefined, done };
+  stepDialogue(dialogue);
 }
 
-// Quand la partie est gagnée ou perdue, les scènes de fin passent avant l'écran de résultat.
+// Joue les événements du script qui répondent à ces déclencheurs, chacun une seule fois.
+function playTriggers(triggers: Trigger[], done: () => void): void {
+  playDialogues(
+    triggers.flatMap((trigger) => takeEvents(CHAPTER1_EVENTS, state, trigger)),
+    done,
+  );
+}
+
+// Dialogues de mort des unités tombées pendant le combat qui vient de se jouer.
+function playDeaths(done: () => void): void {
+  playTriggers(
+    pendingDeaths.splice(0).map((id): Trigger => `mort(${id})`),
+    done,
+  );
+}
+
+// Quand la partie est gagnée ou perdue, les dialogues de fin passent avant l'écran de résultat.
 function settleOutcome(): void {
   if (state.outcome === 'playing' || endHandled) return;
   endHandled = true;
-  const trigger = state.outcome === 'victory' ? 'chapitre.victoire' : 'chapitre.defaite';
-  playScenes(takeEvents(CHAPTER1_EVENTS, state, trigger), () => {
+  playTriggers([state.outcome === 'victory' ? 'chapitre.victoire' : 'chapitre.defaite'], () => {
     fx.showOutcome = true;
     draw();
   });
 }
 
-// Phase ennemie : chaque ennemi joue à son tour (déplacement, puis attaque éventuelle).
+// Phase ennemie : dialogue de début de phase, puis chaque ennemi joue à son tour (déplacement, puis attaque).
 function runEnemyPhase(): void {
   if (enemyPhaseRunning) return;
   enemyPhaseRunning = true;
+  playTriggers([`tour.ennemi(${state.turn})`], playEnemies);
+}
+
+function playEnemies(): void {
   const queue = state.units.filter((unit) => unit.team === 'enemy').map((unit) => unit.id);
 
   const next = (): void => {
@@ -196,6 +220,7 @@ function runEnemyPhase(): void {
       resetUi(ui);
       enemyPhaseRunning = false;
       draw();
+      playTriggers([`tour.joueur(${state.turn})`], draw);
       return;
     }
     const unit = state.units.find((other) => other.id === id);
@@ -215,7 +240,7 @@ function runEnemyPhase(): void {
       playEvents(resolveCombat(state, unit, target, Math.random), () => {
         unit.acted = true;
         draw();
-        setTimeout(next, ENEMY_PAUSE_MS);
+        playDeaths(() => setTimeout(next, ENEMY_PAUSE_MS));
       });
     });
   };
@@ -239,16 +264,18 @@ function play(playback: Playback | null): void {
     playEvents(playback.events, () => {
       finishAction(state, ui);
       draw();
-      settleOutcome();
-      advance();
+      playDeaths(() => {
+        settleOutcome();
+        advance();
+      });
     });
   }
 }
 
 // Tour par tour : on ne redessine qu'après une action ou une étape de lecture.
 function dispatch(action: Action): void {
-  if (scene !== null) {
-    if (action.type === 'confirm') advanceScene(); // pendant une scène, seul le clic de validation compte
+  if (dialogue !== null) {
+    if (action.type === 'confirm') advanceDialogue(); // pendant un dialogue, seul le clic de validation compte
     return;
   }
   switch (action.type) {
@@ -272,4 +299,4 @@ function dispatch(action: Action): void {
 
 attachMouse(canvas, dispatch);
 draw();
-playScenes(takeEvents(CHAPTER1_EVENTS, state, 'chapitre.debut'), draw);
+playTriggers(['chapitre.debut'], () => playTriggers(['tour.joueur(1)'], draw));

@@ -1,0 +1,53 @@
+# Dialogues du chapitre 1. Noms et répliques provisoires, le temps de définir l'univers.
+# Chaque réplique est une clé : le texte se trouve dans src/i18n/story.fr.json.
+
+@event intro quand chapitre.debut
+  @montre anna gauche
+  @montre marc droite
+  anna: ch1.intro.1
+  marc: ch1.intro.2
+  anna: ch1.intro.3
+  @montre lise droite
+  lise: ch1.intro.4
+  @cache marc
+  anna: ch1.intro.5
+
+# Au début de la phase ennemie du tour 2, tant que le boss est debout.
+@event pressentiment quand tour.ennemi(2)
+  @montre marc droite
+  @si vivant(brutus)
+    marc: ch1.pressentiment.1
+  @fin
+
+# Au début du tour 3, la réplique dépend de ce qui est arrivé au lancier.
+@event point-tour3 quand tour.joueur(3)
+  @montre marc gauche
+  @si mort(e2)
+    marc: ch1.tour3.mort
+  @sinon
+    marc: ch1.tour3.vivant
+  @fin
+
+# Quand Lise tombe : le drapeau sert à changer le dialogue de victoire.
+@event adieu-lise quand mort(lise)
+  @montre anna gauche
+  anna: ch1.lise.1
+  @drapeau lise-morte
+
+@event dernier-mot-du-boss quand mort(brutus)
+  @montre brutus droite
+  brutus: ch1.brutus.1
+
+@event victoire quand chapitre.victoire
+  @montre anna gauche
+  @montre marc droite
+  anna: ch1.victoire.1
+  @si drapeau(lise-morte)
+    marc: ch1.victoire.triste
+  @sinon
+    marc: ch1.victoire.2
+  @fin
+
+@event defaite quand chapitre.defaite
+  @montre marc gauche
+  marc: ch1.defaite.1

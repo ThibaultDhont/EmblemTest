@@ -1,6 +1,6 @@
 # Cadrage du projet
 
-Document de référence des décisions de conception. Dernière mise à jour : 2026-11-03, après la revue complète des thèmes (jalons 1 à 3 et étape 4a terminés).
+Document de référence des décisions de conception. Dernière mise à jour : 2026-11-03, après la revue complète des thèmes (jalons 1 à 3 et étapes 4a et 4b terminés).
 
 Ce document remplace les choix précédents quand ils diffèrent (voir « Changements par rapport au départ »).
 
@@ -25,6 +25,13 @@ Ce document remplace les choix précédents quand ils diffèrent (voir « Change
 - **Structure** : plusieurs routes et plusieurs fins.
 - **Personnages** : 20 à 30 personnages jouables.
 - **Relations** : soutiens avec bonus de combat, et romances.
+
+### Vocabulaire du récit
+
+- **Script** : le fichier d'un chapitre. Il contient des événements.
+- **Événement** : un déclencheur (début de chapitre, tour N, mort d'une unité…), des conditions éventuelles et un contenu.
+- **Dialogue** : une suite de répliques affichées dans la boîte en bas de l'écran, avec les portraits. Trois usages : encadrer un niveau (début et fin, pour donner le contexte), les échanges pendant un niveau (tutoriel, recruter une unité en lui parlant, première attaque contre un ennemi, début d'un tour, lieu visité), et les réactions aux événements de la partie (mort d'une unité).
+- **Narration** : les passages entre les niveaux qui racontent l'histoire. Présentation à définir, hors de la carte. À construire avec l'enchaînement des chapitres.
 
 ## 4. Règles de combat
 
@@ -65,7 +72,7 @@ Ce document remplace les choix précédents quand ils diffèrent (voir « Change
 
 - TypeScript strict, Canvas 2D, Vite. Aucune bibliothèque de jeu.
 - Tests avec `node --test`. Pas d'outillage supplémentaire pour l'instant.
-- Contenu (récit, événements, embranchements) écrit dans un format de script dédié : du texte façon scénario (fichiers `.scene`), lu par un analyseur écrit pour le projet, sans dépendance. Les répliques sont des clés de traduction seules, les textes vivent dans `src/i18n/story.fr.json`. Les portraits s'affichent au-dessus de la boîte de dialogue, plusieurs de chaque côté.
+- Contenu (récit, événements, embranchements) écrit dans un format de script dédié : du texte façon scénario (fichiers `.script`), lu par un analyseur écrit pour le projet, sans dépendance. Les répliques sont des clés de traduction seules, les textes vivent dans `src/i18n/story.fr.json`. Les portraits s'affichent au-dessus de la boîte de dialogue, plusieurs de chaque côté.
 - Méthode de création des cartes : à décider plus tard (texte dans le code aujourd'hui).
 - Langue : français d'abord. L'infrastructure i18n (fr/en) reste en place.
 
@@ -106,22 +113,22 @@ Ce document remplace les choix précédents quand ils diffèrent (voir « Change
 ## Ordre de jalons proposé
 
 1. Récit et dialogues (jalon 4), découpé en étapes :
-   - **4a (fait)** : format de script, analyseur, boîte de dialogue avec portraits, scènes de début et de fin de chapitre.
-   - 4b : déclencheurs de début de tour et de mort d'une unité, conditions (vivant, mort, tour, drapeaux), événements uniques.
-   - 4c : vitesse du texte réglable, passer la scène, historique des dialogues.
+   - **4a (fait)** : format de script, analyseur, boîte de dialogue avec portraits, dialogues de début et de fin de chapitre.
+   - **4b (fait)** : déclencheurs de début de tour (joueur et ennemi) et de mort d'une unité, conditions (vivant, mort, tour, drapeaux), blocs @si/@sinon, drapeaux, événements joués une seule fois.
+   - 4c : vitesse du texte réglable, passer un dialogue, historique des dialogues.
    - 4d : choix du joueur dans les dialogues, routes et drapeaux d'embranchement.
    - 4e : mise en scène : unités qui apparaissent ou se déplacent, changement d'objectif, ennemi qui passe dans le camp.
-   - 4f : déclencheurs de case atteinte et commande « Parler » entre deux unités adjacentes.
+   - 4f : déclencheurs d'actions du joueur en cours de niveau : première attaque contre un ennemi donné, case atteinte ou lieu visité, commande « Parler » entre deux unités adjacentes (recrutement), sélection d'une unité (tutoriel).
 2. Caméra et défilement, entrées tactiles.
 3. Sauvegarde, écran titre et menus, options.
 4. Progression : XP, croissances, promotion.
 5. Combat étendu : magie, soins, cavaliers, volants, durabilité et rangs.
-6. Inventaire, boutique, forge, convoi, préparation de bataille, base.
+6. Entre les chapitres : narration, inventaire, boutique, forge, convoi, préparation de bataille, base, carte du monde.
 7. Art, écran de combat dédié, audio.
 8. Tranche verticale : un chapitre complet, puis quelques chapitres pour les premiers tests.
 
-## État actuel du code (jalons 1 à 3 et étape 4a)
+## État actuel du code (jalons 1 à 3 et étapes 4a et 4b)
 
-**Fait** : grille et déplacement avec coût de terrain, combat (triangle physique, double attaque, riposte selon la portée, critique, 2RN), mort définitive, phases joueur et ennemie, IA à trois profils, seigneur et boss avec écran de fin, déplacements animés, i18n fr/en, script de scènes (format texte, analyseur, interpréteur), dialogues avec portraits provisoires et texte progressif, scènes de début et de fin de chapitre, tests.
+**Fait** : grille et déplacement avec coût de terrain, combat (triangle physique, double attaque, riposte selon la portée, critique, 2RN), mort définitive, phases joueur et ennemie, IA à trois profils, seigneur et boss avec écran de fin, déplacements animés, i18n fr/en, script de dialogues (format texte, analyseur, interpréteur avec blocs @si et drapeaux), dialogues avec portraits provisoires et texte progressif, déclencheurs de début et de fin de chapitre, de début de tour et de mort d'une unité, tests.
 
-**Pas encore fait** : tout ce qui n'est pas listé ci-dessus, en particulier la suite du récit (étapes 4b à 4f), la caméra, la sauvegarde, la progression, la magie, l'inventaire et les vrais assets.
+**Pas encore fait** : tout ce qui n'est pas listé ci-dessus, en particulier la suite du récit (étapes 4c à 4f, narration entre les niveaux), la caméra, la sauvegarde, la progression, la magie, l'inventaire et les vrais assets.

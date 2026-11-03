@@ -7,12 +7,12 @@ import { drawDialogue } from './dialogue.ts';
 import type { DialogueView } from './dialogue.ts';
 import { drawForecast, drawHud, drawInfoPanel, drawMenu, drawOutcome } from './panels.ts';
 
-// Effets ponctuels : lecture d'un combat, scène de dialogue, écran de fin.
+// Effets ponctuels : lecture d'un combat, dialogue en cours, écran de fin.
 export interface Effects {
   flashId: string | null; // unité qui clignote en blanc
   popup: { pos: Pos; text: string; color: string } | null; // dégâts affichés au-dessus d'une case
   dialogue: DialogueView | null; // réplique en cours : elle remplace les panneaux de jeu
-  showOutcome: boolean; // l'écran de victoire ou de défaite apparaît après les scènes de fin
+  showOutcome: boolean; // l'écran de victoire ou de défaite apparaît après les dialogues de fin
 }
 
 export interface Renderer {

@@ -50,4 +50,5 @@ export interface GameState {
   phase: Team; // camp qui joue
   outcome: Outcome;
   fired: string[]; // identifiants des événements de script déjà joués
+  flags: string[]; // drapeaux de récit actifs, posés et lus par les scripts
 }
