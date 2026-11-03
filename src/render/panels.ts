@@ -2,7 +2,7 @@ import { SCREEN_HEIGHT, SCREEN_WIDTH, TILE_SIZE, VIEW_COLS } from '../config.ts'
 import { forecast } from '../core/combat.ts';
 import type { Combatant } from '../core/combat.ts';
 import { terrainAt, unitAt } from '../core/grid.ts';
-import { MENU_WIDTH, menuItemAt } from '../core/selection.ts';
+import { BACK_BUTTON, MENU_WIDTH, backButtonAt, menuItemAt } from '../core/selection.ts';
 import type { Menu, UiState } from '../core/selection.ts';
 import type { GameState, Objective } from '../core/types.ts';
 import { CLASSES } from '../data/classes.ts';
@@ -68,6 +68,22 @@ export function drawMenu(ctx: CanvasRenderingContext2D, ui: UiState, menu: Menu)
     ctx.fillStyle = '#ffffff';
     ctx.fillText(t(`menu.${item}`), x + 6, rowY + 4);
   });
+}
+
+// Bouton « Retour », dans le style des boutons des dialogues ; l'appelant ne le dessine que si une annulation est possible.
+export function drawBackButton(ctx: CanvasRenderingContext2D, ui: UiState): void {
+  const x = BACK_BUTTON.x * TILE_SIZE + 2;
+  const y = BACK_BUTTON.y * TILE_SIZE + 2;
+  const width = BACK_BUTTON.width * TILE_SIZE - 4;
+  drawBox(ctx, x, y, width, TILE_SIZE - 4);
+  if (backButtonAt(ui.pointer)) {
+    ctx.fillStyle = '#2d3f8f';
+    ctx.fillRect(x, y, width, TILE_SIZE - 4);
+  }
+  setText(ctx);
+  const label = t('ui.back');
+  ctx.fillStyle = '#ffffff';
+  ctx.fillText(label, x + Math.round((width - ctx.measureText(label).width) / 2), y + 2);
 }
 
 const damageText = (c: Combatant): string => (c.strikes === 0 ? '--' : c.strikes === 1 ? `${c.damage}` : `${c.damage}×2`);

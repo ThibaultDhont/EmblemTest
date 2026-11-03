@@ -2,12 +2,17 @@ import { VIEW_COLS, VIEW_ROWS } from '../config.ts';
 import { edgeDirection } from '../core/camera.ts';
 import type { Pos } from '../core/types.ts';
 import type { ActionHandler } from './actions.ts';
+import { isTap, moveGesture, startGesture } from './gesture.ts';
+import type { Gesture } from './gesture.ts';
 
 const EDGE_SCROLL_MS = 150; // délai entre deux tuiles de défilement quand le pointeur reste au bord
 
-export function attachMouse(canvas: HTMLCanvasElement, dispatch: ActionHandler): void {
+// Souris : le pointeur suit la case survolée, le clic valide, le clic droit annule, le bord de l'écran et la molette
+// font défiler. Doigt et stylet : poser place le curseur, lever sans avoir bougé valide, glisser fait défiler la carte.
+export function attachPointer(canvas: HTMLCanvasElement, dispatch: ActionHandler): void {
   let hovered: Pos | null = null;
   let edgeTimer: number | undefined;
+  let touch: { id: number; gesture: Gesture } | null = null; // le doigt qui joue, les autres sont ignorés
 
   const tileAt = (event: PointerEvent): Pos => {
     const rect = canvas.getBoundingClientRect();
@@ -25,27 +30,55 @@ export function attachMouse(canvas: HTMLCanvasElement, dispatch: ActionHandler):
     edgeTimer = window.setInterval(() => dispatch({ type: 'pan', dx: direction.x, dy: direction.y }), EDGE_SCROLL_MS);
   };
 
+  const place = (pos: Pos): void => {
+    hovered = pos;
+    dispatch({ type: 'pointer', pos });
+  };
+
   const hover = (event: PointerEvent): void => {
     const pos = tileAt(event);
     if (hovered?.x === pos.x && hovered.y === pos.y) return;
-    hovered = pos;
-    dispatch({ type: 'pointer', pos });
-    if (event.pointerType === 'mouse') scrollAtEdge(pos);
+    place(pos);
+    scrollAtEdge(pos);
   };
 
-  canvas.addEventListener('pointermove', hover);
+  canvas.addEventListener('pointermove', (event) => {
+    if (event.pointerType === 'mouse') {
+      hover(event);
+    } else if (touch?.id === event.pointerId) {
+      const tilePx = canvas.getBoundingClientRect().width / VIEW_COLS;
+      const shift = moveGesture(touch.gesture, event.clientX, event.clientY, tilePx);
+      if (shift.x !== 0 || shift.y !== 0) dispatch({ type: 'drag', dx: shift.x, dy: shift.y });
+    }
+  });
   canvas.addEventListener('pointerleave', () => {
     hovered = null;
     scrollAtEdge(null);
   });
+
   canvas.addEventListener('pointerdown', (event) => {
-    if (event.button === 0) {
-      hover(event);
-      dispatch({ type: 'confirm' });
-    } else if (event.button === 2) {
-      dispatch({ type: 'cancel' });
+    if (event.pointerType === 'mouse') {
+      if (event.button === 0) {
+        hover(event);
+        dispatch({ type: 'confirm' });
+      } else if (event.button === 2) {
+        dispatch({ type: 'cancel' });
+      }
+    } else if (touch === null && event.isPrimary) {
+      touch = { id: event.pointerId, gesture: startGesture(event.clientX, event.clientY) };
+      place(tileAt(event));
     }
   });
+  canvas.addEventListener('pointerup', (event) => {
+    if (touch?.id !== event.pointerId) return;
+    const tap = isTap(touch.gesture);
+    touch = null;
+    if (tap) dispatch({ type: 'confirm' });
+  });
+  canvas.addEventListener('pointercancel', (event) => {
+    if (touch?.id === event.pointerId) touch = null;
+  });
+
   canvas.addEventListener('contextmenu', (event) => event.preventDefault());
   canvas.addEventListener(
     'wheel',

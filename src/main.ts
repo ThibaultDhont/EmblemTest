@@ -17,7 +17,18 @@ import {
 import type { Choice, DialogueRunner, Line, StageStep } from './core/dialogue.ts';
 import type { ScriptEvent, Trigger } from './core/script.ts';
 import { updateOutcome } from './core/objective.ts';
-import { MENU_WIDTH, cancel, confirm, createUiState, finishAction, finishMove, resetUi, setCursor } from './core/selection.ts';
+import {
+  MENU_WIDTH,
+  backButtonAt,
+  canCancel,
+  cancel,
+  confirm,
+  createUiState,
+  finishAction,
+  finishMove,
+  resetUi,
+  setCursor,
+} from './core/selection.ts';
 import type { Playback } from './core/selection.ts';
 import { arrivalTriggers, attackTrigger, selectionTrigger, talkTrigger } from './core/triggers.ts';
 import { endEnemyPhase } from './core/turn.ts';
@@ -26,7 +37,7 @@ import { CHAPTER1_EVENTS } from './data/chapter1.events.ts';
 import { createChapter1 } from './data/chapter1.ts';
 import { detectLanguage, setLanguage, storyText, t } from './i18n/index.ts';
 import type { Action } from './input/actions.ts';
-import { attachMouse } from './input/mouse.ts';
+import { attachPointer } from './input/pointer.ts';
 import type { DialogueView } from './render/dialogue.ts';
 import { objectiveText } from './render/panels.ts';
 import { createRenderer } from './render/renderer.ts';
@@ -471,6 +482,7 @@ function handleDialogueAction(active: ActiveDialogue, action: Action): void {
       break;
     case 'scroll':
     case 'pan':
+    case 'drag':
       break;
   }
 }
@@ -632,6 +644,11 @@ function dispatch(action: Action): void {
       pointTo(action.pos);
       break;
     case 'confirm':
+      if (backButtonAt(ui.pointer) && canCancel(state, ui)) {
+        cancel(state, ui);
+        revealMenu();
+        break;
+      }
       if (state.outcome !== 'playing') {
         if (fx.showOutcome) location.reload(); // partie terminée : un clic relance le chapitre
         return;
@@ -655,11 +672,14 @@ function dispatch(action: Action): void {
       if (!canPan()) edgeArmed = false;
       if (!edgeArmed || !panCamera(action.dx, action.dy)) return;
       break;
+    case 'drag':
+      if (!panCamera(action.dx, action.dy)) return;
+      break;
   }
   draw();
   advance();
 }
 
-attachMouse(canvas, dispatch);
+attachPointer(canvas, dispatch);
 draw();
 playTriggers(['chapitre.debut'], () => playTriggers(['tour.joueur(1)'], () => showBanner('objective.title', draw)));

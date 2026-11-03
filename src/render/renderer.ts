@@ -2,11 +2,12 @@ import { SCREEN_HEIGHT, SCREEN_WIDTH, TILE_SIZE } from '../config.ts';
 import { tilesInRange } from '../core/combat.ts';
 import { posOf, tileIndex } from '../core/grid.ts';
 import { objectiveTarget } from '../core/objective.ts';
+import { canCancel } from '../core/selection.ts';
 import type { UiState } from '../core/selection.ts';
 import type { ClassId, GameState, Pos, TerrainId, Team, Unit } from '../core/types.ts';
 import { drawChoice, drawDialogue, drawHistory } from './dialogue.ts';
 import type { ChoiceView, DialogueView, HistoryView } from './dialogue.ts';
-import { drawBanner, drawForecast, drawHud, drawInfoPanel, drawMenu, drawOutcome } from './panels.ts';
+import { drawBackButton, drawBanner, drawForecast, drawHud, drawInfoPanel, drawMenu, drawOutcome } from './panels.ts';
 import type { Banner } from './panels.ts';
 
 // Effets ponctuels : lecture d'un combat, dialogue en cours, écran de fin.
@@ -98,6 +99,7 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
       }
       drawHud(ctx, state);
       if (ui.mode === 'idle' || ui.mode === 'move') drawInfoPanel(ctx, state, ui);
+      if (canCancel(state, ui)) drawBackButton(ctx, ui);
       if (ui.menu !== null) drawMenu(ctx, ui, ui.menu);
       if (ui.mode === 'target' && ui.targetKind === 'attack') drawForecast(ctx, state, ui);
       if (fx.showOutcome) drawOutcome(ctx, state);

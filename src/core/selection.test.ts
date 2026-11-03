@@ -2,7 +2,18 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { applyEvent } from './combat.ts';
 import { stateFromRows, tileIndex } from './grid.ts';
-import { MENU_WIDTH, cancel, confirm, createUiState, finishAction, finishMove, setCursor } from './selection.ts';
+import {
+  BACK_BUTTON,
+  MENU_WIDTH,
+  backButtonAt,
+  canCancel,
+  cancel,
+  confirm,
+  createUiState,
+  finishAction,
+  finishMove,
+  setCursor,
+} from './selection.ts';
 import type { MenuItem, Playback, UiState } from './selection.ts';
 import { parseScript } from './script.ts';
 import { makeUnit } from './test-helpers.ts';
@@ -299,4 +310,52 @@ test('le curseur ignore une position hors de la carte', () => {
   setCursor(state, ui, { x: 2, y: 1 });
   setCursor(state, ui, { x: 99, y: 99 });
   assert.deepEqual(ui.cursor, { x: 2, y: 1 });
+});
+
+test("canCancel : vrai seulement quand il y a quelque chose à défaire pendant la phase joueur", () => {
+  const { state, ui } = setup();
+  assert.equal(canCancel(state, ui), false); // idle
+
+  click(state, ui, 0, 0);
+  assert.equal(canCancel(state, ui), true); // move
+
+  click(state, ui, 0, 0);
+  assert.equal(ui.mode, 'menu');
+  assert.equal(canCancel(state, ui), true);
+
+  cancel(state, ui); // le menu se ferme, retour à la zone de déplacement
+  assert.equal(ui.mode, 'move');
+  cancel(state, ui);
+  assert.equal(canCancel(state, ui), false); // retour à idle
+
+  click(state, ui, 5, 2);
+  assert.equal(ui.mode, 'system');
+  assert.equal(canCancel(state, ui), true);
+
+  state.phase = 'enemy';
+  assert.equal(canCancel(state, ui), false);
+  state.phase = 'player';
+  state.outcome = 'victory';
+  assert.equal(canCancel(state, ui), false);
+});
+
+test('canCancel : faux pendant la lecture, vrai au ciblage', () => {
+  const { state, ui } = setup();
+  click(state, ui, 0, 0);
+  act(state, ui, 2, 0);
+  clickItem(state, ui, 'attack');
+  assert.equal(ui.mode, 'target');
+  assert.equal(canCancel(state, ui), true);
+  click(state, ui, 3, 0);
+  assert.equal(ui.mode, 'busy');
+  assert.equal(canCancel(state, ui), false);
+});
+
+test('backButtonAt : les quatre tuiles du bouton, sur la rangée du haut seulement', () => {
+  const { x, y, width } = BACK_BUTTON;
+  assert.equal(backButtonAt({ x, y }), true);
+  assert.equal(backButtonAt({ x: x + width - 1, y }), true);
+  assert.equal(backButtonAt({ x: x - 1, y }), false);
+  assert.equal(backButtonAt({ x: x + width, y }), false);
+  assert.equal(backButtonAt({ x, y: y + 1 }), false);
 });

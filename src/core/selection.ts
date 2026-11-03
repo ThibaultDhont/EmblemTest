@@ -65,6 +65,13 @@ export function menuItemAt(menu: Menu, pos: Pos): MenuItem | undefined {
   return menu.items[pos.y - menu.y];
 }
 
+// Bouton « Retour » : une tuile de haut, en haut au centre de l'écran. Il remplace le clic droit.
+export const BACK_BUTTON = { x: 10, y: 0, width: 4 }; // en tuiles de l'écran
+
+export function backButtonAt(pos: Pos): boolean {
+  return pos.y === BACK_BUTTON.y && pos.x >= BACK_BUTTON.x && pos.x < BACK_BUTTON.x + BACK_BUTTON.width;
+}
+
 export function setCursor(state: GameState, ui: UiState, pos: Pos): void {
   if (inBounds(state, pos)) ui.cursor = pos;
 }
@@ -92,6 +99,11 @@ export function confirm(state: GameState, ui: UiState, rng: Rng): Playback | nul
     case 'busy':
       return null;
   }
+}
+
+// Vrai quand `cancel` a quelque chose à défaire : une unité choisie, un menu ou un ciblage ouvert.
+export function canCancel(state: GameState, ui: UiState): boolean {
+  return canPlay(state) && (ui.mode === 'move' || ui.mode === 'menu' || ui.mode === 'target' || ui.mode === 'system');
 }
 
 export function cancel(state: GameState, ui: UiState): void {

@@ -2,7 +2,7 @@
 <html lang="fr">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <title>Tactics Prototype</title>
     <style>
       html,
@@ -11,6 +11,13 @@
         height: 100%;
         overflow: hidden;
         background: #10131c;
+        /* Tactile : le jeu gère lui-même les gestes (zoom, rebond, sélection, menu d'appui long). */
+        touch-action: none;
+        overscroll-behavior: none;
+        user-select: none;
+        -webkit-user-select: none;
+        -webkit-touch-callout: none;
+        -webkit-tap-highlight-color: transparent;
       }
       body {
         display: grid;
