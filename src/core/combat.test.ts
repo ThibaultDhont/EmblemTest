@@ -167,6 +167,22 @@ test('la mort du seigneur fait perdre, celle du boss fait gagner, une autre mort
   assert.equal(other.state.outcome, 'playing');
 });
 
+test("pendant une escorte, la mort de l'unité escortée fait perdre, pas celle des autres", () => {
+  const lost = duel();
+  lost.state.objective = { type: 'escort', unit: 'a', x: 3, y: 0 };
+  applyEvent(lost.state, { type: 'death', unitId: 'a' });
+  assert.equal(lost.state.outcome, 'defeat');
+
+  const other = duel();
+  other.state.objective = { type: 'escort', unit: 'a', x: 3, y: 0 };
+  applyEvent(other.state, { type: 'death', unitId: 'd' });
+  assert.equal(other.state.outcome, 'playing');
+
+  const noEscort = duel(); // objectif par défaut : la mort de 'a' n'a aucune conséquence particulière
+  applyEvent(noEscort.state, { type: 'death', unitId: 'a' });
+  assert.equal(noEscort.state.outcome, 'playing');
+});
+
 test("l'objectif décide ce qui fait gagner : déroute ou survie", () => {
   const rout = duel();
   rout.state.objective = { type: 'rout' };

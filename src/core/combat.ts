@@ -148,7 +148,9 @@ export function applyEvent(state: GameState, event: CombatEvent): void {
   } else {
     const dead = state.units.find((unit) => unit.id === event.unitId);
     state.units = state.units.filter((unit) => unit.id !== event.unitId);
-    if (dead?.role === 'lord') state.outcome = 'defeat';
+    // Le seigneur, et l'unité escortée tant que dure l'escorte, ne doivent pas tomber.
+    const escorted = state.objective.type === 'escort' && dead?.id === state.objective.unit;
+    if (dead?.role === 'lord' || escorted) state.outcome = 'defeat';
     else updateOutcome(state, dead);
   }
 }

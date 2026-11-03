@@ -18,9 +18,15 @@ export type AiProfile = 'charge' | 'guard' | 'stationary';
 
 export type Outcome = 'playing' | 'victory' | 'defeat';
 
-// Ce qu'il faut accomplir pour gagner : vaincre le boss, vaincre tous les ennemis, ou tenir jusqu'à la
-// fin de la phase ennemie du tour `turns`. La défaite (mort du seigneur) ne dépend pas de l'objectif.
-export type Objective = { type: 'boss' } | { type: 'rout' } | { type: 'survive'; turns: number };
+// Ce qu'il faut accomplir pour gagner : vaincre le boss, vaincre tous les ennemis, tenir jusqu'à la fin de
+// la phase ennemie du tour `turns`, faire arriver une unité du joueur sur une case (`reach`), ou y faire
+// arriver une unité précise dont la mort fait perdre (`escort`). La mort du seigneur fait toujours perdre.
+export type Objective =
+  | { type: 'boss' }
+  | { type: 'rout' }
+  | { type: 'survive'; turns: number }
+  | { type: 'reach'; x: number; y: number }
+  | { type: 'escort'; unit: string; x: number; y: number };
 
 export interface Stats {
   maxHp: number;

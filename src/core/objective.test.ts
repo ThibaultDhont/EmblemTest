@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { stateFromRows } from './grid.ts';
-import { updateOutcome } from './objective.ts';
+import { objectiveTarget, updateOutcome } from './objective.ts';
 import { makeUnit } from './test-helpers.ts';
 import type { Objective, Unit } from './types.ts';
 
@@ -64,6 +64,42 @@ test('survie : victoire quand le tour dépasse N, pas avant', () => {
   state.turn = 4;
   updateOutcome(state);
   assert.equal(state.outcome, 'victory');
+});
+
+test('atteindre : une unité du joueur sur la case suffit, pas un ennemi ni une unité ailleurs', () => {
+  const goal: Objective = { type: 'reach', x: 3, y: 0 };
+
+  const enemyThere = setup(goal, [lord(), foe('e1', 3)]);
+  updateOutcome(enemyThere);
+  assert.equal(enemyThere.outcome, 'playing');
+
+  const elsewhere = setup(goal, [makeUnit({ id: 'anna', role: 'lord', pos: { x: 2, y: 0 } })]);
+  updateOutcome(elsewhere);
+  assert.equal(elsewhere.outcome, 'playing');
+
+  const arrived = setup(goal, [makeUnit({ id: 'anna', role: 'lord', pos: { x: 3, y: 0 } })]);
+  updateOutcome(arrived);
+  assert.equal(arrived.outcome, 'victory');
+});
+
+test("escorte : seule l'unité désignée gagne en arrivant", () => {
+  const goal: Objective = { type: 'escort', unit: 'marc', x: 3, y: 0 };
+
+  const other = setup(goal, [makeUnit({ id: 'anna', role: 'lord', pos: { x: 3, y: 0 } }), makeUnit({ id: 'marc', pos: { x: 1, y: 0 } })]);
+  updateOutcome(other);
+  assert.equal(other.outcome, 'playing');
+
+  const escorted = setup(goal, [lord(), makeUnit({ id: 'marc', pos: { x: 3, y: 0 } })]);
+  updateOutcome(escorted);
+  assert.equal(escorted.outcome, 'victory');
+});
+
+test('objectiveTarget donne la case visée, et rien pour les autres objectifs', () => {
+  assert.deepEqual(objectiveTarget({ type: 'reach', x: 1, y: 14 }), { x: 1, y: 14 });
+  assert.deepEqual(objectiveTarget({ type: 'escort', unit: 'marc', x: 2, y: 3 }), { x: 2, y: 3 });
+  assert.equal(objectiveTarget({ type: 'boss' }), undefined);
+  assert.equal(objectiveTarget({ type: 'rout' }), undefined);
+  assert.equal(objectiveTarget({ type: 'survive', turns: 3 }), undefined);
 });
 
 test('une issue déjà décidée ne change plus', () => {

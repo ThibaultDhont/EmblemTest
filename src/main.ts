@@ -15,6 +15,7 @@ import {
 } from './core/dialogue.ts';
 import type { Choice, DialogueRunner, Line, StageStep } from './core/dialogue.ts';
 import type { ScriptEvent, Trigger } from './core/script.ts';
+import { updateOutcome } from './core/objective.ts';
 import { cancel, confirm, createUiState, finishAction, finishMove, resetUi, setCursor } from './core/selection.ts';
 import type { Playback } from './core/selection.ts';
 import { arrivalTriggers, attackTrigger, selectionTrigger, talkTrigger } from './core/triggers.ts';
@@ -535,6 +536,13 @@ function play(playback: Playback | null): void {
     // Arrivée : les dialogues de la case se jouent après l'animation, avant que le menu d'actions s'ouvre.
     playMove(unit, playback.path, () => {
       playTriggers(arrivalTriggers(unit, unit.pos), () => {
+        updateOutcome(state); // atteindre ou escorter : l'arrivée peut suffire à gagner
+        if (state.outcome !== 'playing') {
+          resetUi(ui);
+          draw();
+          settleOutcome();
+          return;
+        }
         finishMove(state, ui);
         draw();
       });

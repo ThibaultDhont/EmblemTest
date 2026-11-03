@@ -107,6 +107,21 @@ test("les déclencheurs d'actions du joueur visent des unités et des cases prat
   }
 });
 
+test('les objectifs à atteindre visent une case praticable, et une unité du chapitre pour une escorte', () => {
+  const chapter = createChapter1();
+  const ids = new Set([...chapter.units, ...chapter.reserve].map((unit) => unit.id));
+  for (const command of commands) {
+    if (command.op !== 'objective') continue;
+    const objective = command.objective;
+    if (objective.type === 'escort') assert.ok(ids.has(objective.unit), `unité inconnue : ${objective.unit}`);
+    if (objective.type === 'reach' || objective.type === 'escort') {
+      const pos = { x: objective.x, y: objective.y };
+      assert.ok(inBounds(chapter, pos), `case hors de la carte : ${pos.x},${pos.y}`);
+      assert.notEqual(terrainAt(chapter, pos), 'wall', `case dans un mur : ${pos.x},${pos.y}`);
+    }
+  }
+});
+
 test('chaque unité de réserve est appelée par un @apparait', () => {
   const spawned = new Set(commands.flatMap((command) => (command.op === 'spawn' ? [command.unit] : [])));
   const forgotten = createChapter1().reserve.filter((unit) => !spawned.has(unit.id));

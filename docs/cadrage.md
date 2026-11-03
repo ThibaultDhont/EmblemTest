@@ -1,6 +1,6 @@
 # Cadrage du projet
 
-Document de référence des décisions de conception. Dernière mise à jour : 2026-11-03, après la revue complète des thèmes (jalons 1 à 3 et étapes 4a à 4h terminés).
+Document de référence des décisions de conception. Dernière mise à jour : 2026-11-03, après la revue complète des thèmes (jalons 1 à 3 et étapes 4a à 4i terminés).
 
 Ce document remplace les choix précédents quand ils diffèrent (voir « Changements par rapport au départ »).
 
@@ -118,10 +118,10 @@ Ce document remplace les choix précédents quand ils diffèrent (voir « Change
    - **4c (fait)** : mode Auto (passage automatique après 3 secondes), passer un dialogue avec confirmation, historique de tous les dialogues déjà vus. La vitesse du texte réglable est reportée au menu d'options.
    - **4d (fait)** : choix du joueur dans les dialogues (`@choix` / `@option`, jusqu'à 4 options, panneau au milieu de l'écran), drapeaux d'embranchement relus par les dialogues suivants. « Passer » s'arrête au choix, Auto est en pause, le choix entre dans l'historique. Changer de route ou de chapitre suppose l'enchaînement des chapitres.
    - **4e (fait)** : mise en scène des unités : apparition depuis une réserve (`@apparait`), déplacement animé (`@deplace`), ennemi qui passe dans le camp (`@recrute`). Le dialogue s'efface pendant l'action, « Passer » applique tout instantanément.
-   - **4f (fait)** : objectifs de chapitre : vaincre le boss (par défaut), vaincre tous les ennemis (`deroute`), survivre jusqu'à la fin du tour N (`survie N`), changeables par `@objectif`. Affichés dans le HUD et annoncés par une bannière au début du chapitre et à chaque changement. La défaite (mort du seigneur) ne dépend pas de l'objectif. Les objectifs « atteindre une case » et « escorter » viendront à l'étape 4i.
+   - **4f (fait)** : objectifs de chapitre : vaincre le boss (par défaut), vaincre tous les ennemis (`deroute`), survivre jusqu'à la fin du tour N (`survie N`), changeables par `@objectif`. Affichés dans le HUD et annoncés par une bannière au début du chapitre et à chaque changement. La défaite (mort du seigneur) ne dépend pas de l'objectif. Les objectifs « atteindre une case » et « escorter » sont venus à l'étape 4i.
    - **4g (fait)** : déclencheurs d'actions du joueur : `selection(id)` (sélection d'une unité, utile au tutoriel), `attaque(id)` (avant le combat), `case(x,y)` et `case(id,x,y)` (arrivée sur une case après un déplacement).
    - **4h (fait)** : commande « Parler » : une entrée de menu apparaît quand une unité est voisine d'une autre pour qui le script prévoit un événement `parler(a,b)` non joué. Un seul interlocuteur : la conversation se lance ; plusieurs : on désigne lequel (surbrillance verte). Elle termine l'action de l'unité et peut recruter (`@recrute`). Les soutiens avec bonus de combat restent à faire.
-   - 4i : objectifs « atteindre une case » et « escorter », avec leur affichage.
+   - **4i (fait)** : objectifs « atteindre une case » (`atteindre x y` : une unité du joueur sur la case suffit) et « escorter » (`escorte unité x y` : seule l'unité désignée gagne en arrivant, et sa mort fait perdre). La case visée est marquée sur la carte (voile jaune et coins) et le HUD l'annonce. La victoire se déclenche dès l'arrivée, sans attendre la fin de l'action de l'unité. Dans le chapitre 1, la voie prudente bascule en escorte de Marc (ou en « atteindre » si Marc est mort) vers la case (1,14), la voie audacieuse reste en « survie 4 ». Limite connue : `@recrute` et `@objectif` ne réévaluent pas la victoire sur le champ (elle l'est après une mort, à la fin de la phase ennemie et à l'arrivée d'une unité du joueur). Le jalon 4 est terminé ; la narration entre les chapitres relève de l'étape 6.
 2. Caméra et défilement, entrées tactiles.
 3. Sauvegarde, écran titre et menus, options (dont la vitesse du texte des dialogues).
 4. Progression : XP, croissances, promotion.
@@ -130,8 +130,8 @@ Ce document remplace les choix précédents quand ils diffèrent (voir « Change
 7. Art, écran de combat dédié, audio.
 8. Tranche verticale : un chapitre complet, puis quelques chapitres pour les premiers tests.
 
-## État actuel du code (jalons 1 à 3 et étapes 4a à 4h)
+## État actuel du code (jalons 1 à 3 et étapes 4a à 4i)
 
-**Fait** : grille et déplacement avec coût de terrain, combat (triangle physique, double attaque, riposte selon la portée, critique, 2RN), mort définitive, phases joueur et ennemie, IA à trois profils, seigneur et boss avec écran de fin, objectifs de chapitre (boss, déroute, survie) affichés dans le HUD et annoncés par une bannière, déplacements animés, i18n fr/en, script de dialogues (format texte, analyseur, interpréteur avec blocs @si et drapeaux), dialogues avec portraits provisoires et texte progressif (mode Auto, passer avec confirmation, historique, choix du joueur, mise en scène des unités), déclencheurs de début et de fin de chapitre, de début de tour, de mort d'une unité et d'actions du joueur (sélection, attaque, arrivée sur une case), commande « Parler » avec recrutement par la parole, tests.
+**Fait** : grille et déplacement avec coût de terrain, combat (triangle physique, double attaque, riposte selon la portée, critique, 2RN), mort définitive, phases joueur et ennemie, IA à trois profils, seigneur et boss avec écran de fin, objectifs de chapitre (boss, déroute, survie, atteindre une case, escorter) affichés dans le HUD, avec la case visée marquée sur la carte, et annoncés par une bannière, déplacements animés, i18n fr/en, script de dialogues (format texte, analyseur, interpréteur avec blocs @si et drapeaux), dialogues avec portraits provisoires et texte progressif (mode Auto, passer avec confirmation, historique, choix du joueur, mise en scène des unités), déclencheurs de début et de fin de chapitre, de début de tour, de mort d'une unité et d'actions du joueur (sélection, attaque, arrivée sur une case), commande « Parler » avec recrutement par la parole, tests.
 
-**Pas encore fait** : tout ce qui n'est pas listé ci-dessus, en particulier la suite du récit (étape 4i, narration entre les niveaux), la caméra, la sauvegarde, la progression, la magie, l'inventaire et les vrais assets.
+**Pas encore fait** : tout ce qui n'est pas listé ci-dessus, en particulier la narration entre les niveaux, la caméra, la sauvegarde, la progression, la magie, l'inventaire et les vrais assets.

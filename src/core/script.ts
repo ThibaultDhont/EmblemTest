@@ -239,15 +239,28 @@ function parseCommand(line: string, words: string[], lineNumber: number, blocks:
   return { op: 'say', speaker, key };
 }
 
-// boss, deroute (vaincre tous les ennemis) ou `survie N` (tenir jusqu'à la fin du tour N, N ≥ 1).
+// boss, deroute (vaincre tous les ennemis), `survie N` (tenir jusqu'à la fin du tour N, N ≥ 1),
+// `atteindre x y` (une unité du joueur sur la case) ou `escorte unité x y` (cette unité sur la case).
 function parseObjective(words: string[], lineNumber: number): Objective {
-  const [kind, turns] = words;
+  const [kind, first, second, third] = words;
+  const integer = (value: string | undefined): value is string => value !== undefined && INTEGER.test(value);
+
   if (words.length === 1 && kind === 'boss') return { type: 'boss' };
   if (words.length === 1 && kind === 'deroute') return { type: 'rout' };
-  if (words.length === 2 && kind === 'survie' && turns !== undefined && /^[1-9]\d*$/.test(turns)) {
-    return { type: 'survive', turns: Number(turns) };
+  if (words.length === 2 && kind === 'survie' && first !== undefined && /^[1-9]\d*$/.test(first)) {
+    return { type: 'survive', turns: Number(first) };
   }
-  throw new ScriptError(lineNumber, 'syntaxe attendue « @objectif boss », « @objectif deroute » ou « @objectif survie <N> » (N ≥ 1)');
+  if (words.length === 3 && kind === 'atteindre' && integer(first) && integer(second)) {
+    return { type: 'reach', x: Number(first), y: Number(second) };
+  }
+  if (words.length === 4 && kind === 'escorte' && first !== undefined && NAME_ONLY.test(first) && integer(second) && integer(third)) {
+    return { type: 'escort', unit: first, x: Number(second), y: Number(third) };
+  }
+  throw new ScriptError(
+    lineNumber,
+    'syntaxe attendue : « @objectif boss », « @objectif deroute », « @objectif survie <N> » (N ≥ 1), ' +
+      '« @objectif atteindre <x> <y> » ou « @objectif escorte <unité> <x> <y> »',
+  );
 }
 
 // vivant(id), mort(id), drapeau(nom) ou `tour <op> N`, éventuellement précédés de `non`.

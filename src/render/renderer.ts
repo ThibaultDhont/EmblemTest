@@ -1,6 +1,7 @@
 import { SCREEN_HEIGHT, SCREEN_WIDTH, TILE_SIZE } from '../config.ts';
 import { tilesInRange } from '../core/combat.ts';
 import { posOf, tileIndex } from '../core/grid.ts';
+import { objectiveTarget } from '../core/objective.ts';
 import type { UiState } from '../core/selection.ts';
 import type { ClassId, GameState, Pos, TerrainId, Team, Unit } from '../core/types.ts';
 import { drawChoice, drawDialogue, drawHistory } from './dialogue.ts';
@@ -58,6 +59,9 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
         const pos = posOf(state, index);
         drawTerrain(ctx, state.tiles[index] ?? 'plain', pos.x * TILE_SIZE, pos.y * TILE_SIZE);
       }
+
+      const goal = objectiveTarget(state.objective);
+      if (goal !== undefined) drawGoal(ctx, goal);
 
       drawOverlay(ctx, state, ui.reachable.keys(), 'rgba(80, 160, 255, 0.5)');
       const selected = state.units.find((unit) => unit.id === ui.selectedId);
@@ -134,6 +138,23 @@ function drawTerrain(ctx: CanvasRenderingContext2D, terrain: TerrainId, x: numbe
   ctx.fillStyle = 'rgba(0, 0, 0, 0.12)';
   ctx.fillRect(x + TILE_SIZE - 1, y, 1, TILE_SIZE);
   ctx.fillRect(x, y + TILE_SIZE - 1, TILE_SIZE, 1);
+}
+
+// Case à atteindre : un voile jaune et quatre coins en équerre.
+function drawGoal(ctx: CanvasRenderingContext2D, pos: Pos): void {
+  const x = pos.x * TILE_SIZE;
+  const y = pos.y * TILE_SIZE;
+  const arm = 5;
+  const far = TILE_SIZE - 1;
+  ctx.fillStyle = 'rgba(255, 225, 77, 0.3)';
+  ctx.fillRect(x, y, TILE_SIZE, TILE_SIZE);
+  ctx.fillStyle = '#ffe14d';
+  for (const [cornerX, cornerY] of [[0, 0], [far, 0], [0, far], [far, far]] as const) {
+    const horizontalX = cornerX === 0 ? x : x + TILE_SIZE - arm;
+    const verticalY = cornerY === 0 ? y : y + TILE_SIZE - arm;
+    ctx.fillRect(horizontalX, y + cornerY, arm, 1);
+    ctx.fillRect(x + cornerX, verticalY, 1, arm);
+  }
 }
 
 function drawOverlay(ctx: CanvasRenderingContext2D, state: GameState, indices: Iterable<number>, color: string): void {

@@ -36,6 +36,8 @@
   "objective.boss": "Defeat the boss",
   "objective.rout": "Defeat all enemies",
   "objective.survive": "Survive until the end of turn {turns}",
+  "objective.reach": "Reach the marked area",
+  "objective.escort": "Escort {name} to the marked area",
   "objective.title": "Objective",
   "objective.new": "New objective",
   "outcome.victory": "Victory!",

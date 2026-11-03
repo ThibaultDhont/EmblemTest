@@ -250,17 +250,24 @@ test('syntaxes invalides de la mise en scène des unités', () => {
   assert.throws(() => parseScript(inEvent('@recrute a b')), /Ligne 2 : .*@recrute/);
 });
 
-test('@objectif reconnaît ses trois formes', () => {
-  const [event] = parseScript(inEvent('@objectif boss', '@objectif deroute', '@objectif survie 4'));
+test('@objectif reconnaît ses cinq formes', () => {
+  const [event] = parseScript(
+    inEvent('@objectif boss', '@objectif deroute', '@objectif survie 4', '@objectif atteindre 1 14', '@objectif escorte marc 1 14'),
+  );
   assert.deepEqual(event?.commands, [
     { op: 'objective', objective: { type: 'boss' } },
     { op: 'objective', objective: { type: 'rout' } },
     { op: 'objective', objective: { type: 'survive', turns: 4 } },
+    { op: 'objective', objective: { type: 'reach', x: 1, y: 14 } },
+    { op: 'objective', objective: { type: 'escort', unit: 'marc', x: 1, y: 14 } },
   ]);
 });
 
 test('@objectif mal formé est refusé', () => {
-  for (const bad of ['', 'survie', 'survie 0', 'survie x', 'survie 2 3', 'boss 3', 'tout']) {
+  const invalid = ['', 'survie', 'survie 0', 'survie x', 'survie 2 3', 'boss 3', 'tout'];
+  invalid.push('atteindre', 'atteindre 3', 'atteindre x y', 'atteindre 1 2 3', 'atteindre -1 2');
+  invalid.push('escorte', 'escorte marc 1', 'escorte Marc 1 2', 'escorte marc x 2', 'escorte 1 2 3');
+  for (const bad of invalid) {
     assert.throws(() => parseScript(inEvent(`@objectif ${bad}`)), /Ligne 2 : .*@objectif/, bad);
   }
 });

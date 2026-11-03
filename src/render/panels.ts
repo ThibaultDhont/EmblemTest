@@ -7,7 +7,7 @@ import type { Menu, UiState } from '../core/selection.ts';
 import type { GameState, Objective } from '../core/types.ts';
 import { CLASSES } from '../data/classes.ts';
 import { TERRAINS } from '../data/terrains.ts';
-import { t } from '../i18n/index.ts';
+import { storyText, t } from '../i18n/index.ts';
 
 // Le texte est antialiasé : une police bitmap viendra avec les vrais assets.
 export function setText(ctx: CanvasRenderingContext2D): void {
@@ -117,6 +117,10 @@ export function objectiveText(objective: Objective): string {
       return t('objective.rout');
     case 'survive':
       return t('objective.survive', { turns: objective.turns });
+    case 'reach':
+      return t('objective.reach');
+    case 'escort':
+      return t('objective.escort', { name: storyText(`char.${objective.unit}`) });
   }
 }
 

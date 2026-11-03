@@ -36,6 +36,8 @@
   "objective.boss": "Vaincre le boss",
   "objective.rout": "Vaincre tous les ennemis",
   "objective.survive": "Tenir jusqu'à la fin du tour {turns}",
+  "objective.reach": "Atteindre la zone marquée",
+  "objective.escort": "Escorter {name} jusqu'à la zone marquée",
   "objective.title": "Objectif",
   "objective.new": "Nouvel objectif",
   "outcome.victory": "Victoire !",
