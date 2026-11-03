@@ -1,5 +1,10 @@
 import { stateFromRows } from '../core/grid.ts';
+import { parseScript } from '../core/script.ts';
 import type { ClassId, GameState, Pos, Stats, Team, Unit, WeaponId } from '../core/types.ts';
+import chapter1Script from './chapter1.scene?raw';
+
+// Scènes du chapitre. Une erreur de script fait échouer le chargement, avec le numéro de ligne.
+export const CHAPTER1_EVENTS = parseScript(chapter1Script);
 
 // . plaine   f forêt   m montagne   # mur
 const MAP = [

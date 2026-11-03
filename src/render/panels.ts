@@ -10,13 +10,13 @@ import { TERRAINS } from '../data/terrains.ts';
 import { t } from '../i18n/index.ts';
 
 // Le texte est antialiasé : une police bitmap viendra avec les vrais assets.
-function setText(ctx: CanvasRenderingContext2D): void {
+export function setText(ctx: CanvasRenderingContext2D): void {
   ctx.font = '8px monospace';
   ctx.textBaseline = 'top';
   ctx.textAlign = 'left';
 }
 
-function drawBox(ctx: CanvasRenderingContext2D, x: number, y: number, width: number, height: number): void {
+export function drawBox(ctx: CanvasRenderingContext2D, x: number, y: number, width: number, height: number): void {
   ctx.fillStyle = '#e8e8f0';
   ctx.fillRect(x - 1, y - 1, width + 2, height + 2);
   ctx.fillStyle = '#141a33';

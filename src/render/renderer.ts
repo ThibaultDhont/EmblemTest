@@ -3,12 +3,16 @@ import { tilesInRange } from '../core/combat.ts';
 import { posOf } from '../core/grid.ts';
 import type { UiState } from '../core/selection.ts';
 import type { ClassId, GameState, Pos, TerrainId, Team, Unit } from '../core/types.ts';
+import { drawDialogue } from './dialogue.ts';
+import type { DialogueView } from './dialogue.ts';
 import { drawForecast, drawHud, drawInfoPanel, drawMenu, drawOutcome } from './panels.ts';
 
-// Effets ponctuels pendant la lecture d'un combat.
+// Effets ponctuels : lecture d'un combat, scène de dialogue, écran de fin.
 export interface Effects {
   flashId: string | null; // unité qui clignote en blanc
   popup: { pos: Pos; text: string; color: string } | null; // dégâts affichés au-dessus d'une case
+  dialogue: DialogueView | null; // réplique en cours : elle remplace les panneaux de jeu
+  showOutcome: boolean; // l'écran de victoire ou de défaite apparaît après les scènes de fin
 }
 
 export interface Renderer {
@@ -60,11 +64,15 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
       drawCursor(ctx, ui);
       drawPopup(ctx, fx);
 
+      if (fx.dialogue !== null) {
+        drawDialogue(ctx, fx.dialogue);
+        return;
+      }
       drawHud(ctx, state);
       if (ui.mode === 'idle' || ui.mode === 'move') drawInfoPanel(ctx, state, ui);
       if (ui.menu !== null) drawMenu(ctx, ui, ui.menu);
       if (ui.mode === 'target') drawForecast(ctx, state, ui);
-      drawOutcome(ctx, state);
+      if (fx.showOutcome) drawOutcome(ctx, state);
     },
   };
 }

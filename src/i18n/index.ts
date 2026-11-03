@@ -1,5 +1,6 @@
 import enMessages from './en.json';
 import frMessages from './fr.json';
+import storyFrMessages from './story.fr.json';
 
 export type MessageKey = keyof typeof frMessages;
 type Messages = Record<MessageKey, string>;
@@ -32,4 +33,12 @@ export function t(key: MessageKey, params: Record<string, string | number> = {})
   return dictionaries[current][key].replace(/\{(\w+)\}/g, (match, name: string) =>
     String(params[name] ?? match),
   );
+}
+
+// Textes du récit, adressés par clés dynamiques (celles des scripts). Une langue qui n'a pas la clé
+// retombe sur le français ; une clé absente partout est repérable à l'écran.
+const stories: Partial<Record<Language, Record<string, string>>> = { fr: storyFrMessages };
+
+export function storyText(key: string): string {
+  return stories[current]?.[key] ?? stories.fr?.[key] ?? `⟦${key}⟧`;
 }

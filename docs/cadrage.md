@@ -1,6 +1,6 @@
 # Cadrage du projet
 
-Document de référence des décisions de conception. Dernière mise à jour : 2026-11-03, après la revue complète des thèmes (jalons 1 à 3 terminés).
+Document de référence des décisions de conception. Dernière mise à jour : 2026-11-03, après la revue complète des thèmes (jalons 1 à 3 et étape 4a terminés).
 
 Ce document remplace les choix précédents quand ils diffèrent (voir « Changements par rapport au départ »).
 
@@ -65,7 +65,7 @@ Ce document remplace les choix précédents quand ils diffèrent (voir « Change
 
 - TypeScript strict, Canvas 2D, Vite. Aucune bibliothèque de jeu.
 - Tests avec `node --test`. Pas d'outillage supplémentaire pour l'instant.
-- Contenu (récit, événements, embranchements) écrit dans un format de script dédié.
+- Contenu (récit, événements, embranchements) écrit dans un format de script dédié : du texte façon scénario (fichiers `.scene`), lu par un analyseur écrit pour le projet, sans dépendance. Les répliques sont des clés de traduction seules, les textes vivent dans `src/i18n/story.fr.json`. Les portraits s'affichent au-dessus de la boîte de dialogue, plusieurs de chaque côté.
 - Méthode de création des cartes : à décider plus tard (texte dans le code aujourd'hui).
 - Langue : français d'abord. L'infrastructure i18n (fr/en) reste en place.
 
@@ -105,7 +105,13 @@ Ce document remplace les choix précédents quand ils diffèrent (voir « Change
 
 ## Ordre de jalons proposé
 
-1. Récit et dialogues : format de script, boîtes de dialogue avec portraits, événements sur la carte.
+1. Récit et dialogues (jalon 4), découpé en étapes :
+   - **4a (fait)** : format de script, analyseur, boîte de dialogue avec portraits, scènes de début et de fin de chapitre.
+   - 4b : déclencheurs de début de tour et de mort d'une unité, conditions (vivant, mort, tour, drapeaux), événements uniques.
+   - 4c : vitesse du texte réglable, passer la scène, historique des dialogues.
+   - 4d : choix du joueur dans les dialogues, routes et drapeaux d'embranchement.
+   - 4e : mise en scène : unités qui apparaissent ou se déplacent, changement d'objectif, ennemi qui passe dans le camp.
+   - 4f : déclencheurs de case atteinte et commande « Parler » entre deux unités adjacentes.
 2. Caméra et défilement, entrées tactiles.
 3. Sauvegarde, écran titre et menus, options.
 4. Progression : XP, croissances, promotion.
@@ -114,8 +120,8 @@ Ce document remplace les choix précédents quand ils diffèrent (voir « Change
 7. Art, écran de combat dédié, audio.
 8. Tranche verticale : un chapitre complet, puis quelques chapitres pour les premiers tests.
 
-## État actuel du code (jalons 1 à 3)
+## État actuel du code (jalons 1 à 3 et étape 4a)
 
-**Fait** : grille et déplacement avec coût de terrain, combat (triangle physique, double attaque, riposte selon la portée, critique, 2RN), mort définitive, phases joueur et ennemie, IA à trois profils, seigneur et boss avec écran de fin, déplacements animés, i18n fr/en, tests.
+**Fait** : grille et déplacement avec coût de terrain, combat (triangle physique, double attaque, riposte selon la portée, critique, 2RN), mort définitive, phases joueur et ennemie, IA à trois profils, seigneur et boss avec écran de fin, déplacements animés, i18n fr/en, script de scènes (format texte, analyseur, interpréteur), dialogues avec portraits provisoires et texte progressif, scènes de début et de fin de chapitre, tests.
 
-**Pas encore fait** : tout ce qui n'est pas listé ci-dessus, en particulier le récit, la caméra, la sauvegarde, la progression, la magie, l'inventaire et les vrais assets.
+**Pas encore fait** : tout ce qui n'est pas listé ci-dessus, en particulier la suite du récit (étapes 4b à 4f), la caméra, la sauvegarde, la progression, la magie, l'inventaire et les vrais assets.

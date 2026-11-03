@@ -49,4 +49,5 @@ export interface GameState {
   turn: number;
   phase: Team; // camp qui joue
   outcome: Outcome;
+  fired: string[]; // identifiants des événements de script déjà joués
 }

@@ -1,12 +1,15 @@
 import { planEnemyAction } from './core/ai.ts';
 import { applyEvent, resolveCombat } from './core/combat.ts';
 import type { CombatEvent } from './core/combat.ts';
+import { NARRATION, nextLine, startScene, takeEvents } from './core/scene.ts';
+import type { Line, SceneRunner } from './core/scene.ts';
+import type { ScriptEvent } from './core/script.ts';
 import { cancel, confirm, createUiState, finishAction, finishMove, resetUi, setCursor } from './core/selection.ts';
 import type { Playback } from './core/selection.ts';
 import { endEnemyPhase } from './core/turn.ts';
 import type { Pos, Unit } from './core/types.ts';
-import { createChapter1 } from './data/chapter1.ts';
-import { detectLanguage, setLanguage, t } from './i18n/index.ts';
+import { CHAPTER1_EVENTS, createChapter1 } from './data/chapter1.ts';
+import { detectLanguage, setLanguage, storyText, t } from './i18n/index.ts';
 import type { Action } from './input/actions.ts';
 import { attachMouse } from './input/mouse.ts';
 import { createRenderer } from './render/renderer.ts';
@@ -15,6 +18,15 @@ import type { Effects } from './render/renderer.ts';
 const MOVE_STEP_MS = 90;
 const COMBAT_STEP_MS = 600;
 const ENEMY_PAUSE_MS = 350;
+const TEXT_STEP_MS = 25;
+
+// Scène de dialogue en cours : les événements restant à jouer et le texte en train de s'écrire.
+interface ActiveScene {
+  queue: ScriptEvent[];
+  runner: SceneRunner | null;
+  timer: number | undefined;
+  done: () => void;
+}
 
 const language = detectLanguage();
 setLanguage(language);
@@ -25,9 +37,11 @@ if (canvas === null) throw new Error('Canvas #game introuvable');
 
 const state = createChapter1();
 const ui = createUiState();
-const fx: Effects = { flashId: null, popup: null };
+const fx: Effects = { flashId: null, popup: null, dialogue: null, showOutcome: false };
 const renderer = createRenderer(canvas);
 let enemyPhaseRunning = false;
+let endHandled = false;
+let scene: ActiveScene | null = null;
 
 const draw = (): void => renderer.draw(state, ui, fx);
 
@@ -81,6 +95,88 @@ function playMove(unit: Unit, path: Pos[], done: () => void): void {
   step();
 }
 
+// Affiche une réplique, dont le texte s'écrit lettre par lettre.
+function startLine(active: ActiveScene, line: Line): void {
+  const text = storyText(line.key);
+  const view = {
+    speaker: line.speaker,
+    name: line.speaker === NARRATION ? '' : storyText(`char.${line.speaker}`),
+    text,
+    revealed: 0,
+    cast: line.cast,
+  };
+  fx.dialogue = view;
+  const type = (): void => {
+    view.revealed += 1;
+    draw();
+    active.timer = view.revealed < text.length ? window.setTimeout(type, TEXT_STEP_MS) : undefined;
+  };
+  active.timer = window.setTimeout(type, TEXT_STEP_MS);
+  draw();
+}
+
+function endScene(active: ActiveScene): void {
+  fx.dialogue = null;
+  scene = null;
+  draw();
+  active.done();
+}
+
+// Passe à la réplique suivante, d'un événement ou du suivant ; termine la scène s'il n'en reste plus.
+function stepScene(active: ActiveScene): void {
+  for (;;) {
+    if (active.runner === null) {
+      const event = active.queue.shift();
+      if (event === undefined) {
+        endScene(active);
+        return;
+      }
+      active.runner = startScene(event);
+    }
+    const line = nextLine(active.runner);
+    if (line === null) {
+      active.runner = null;
+      continue;
+    }
+    startLine(active, line);
+    return;
+  }
+}
+
+// Un clic affiche d'abord toute la réplique, puis passe à la suivante.
+function advanceScene(): void {
+  const view = fx.dialogue;
+  if (scene === null || view === null) return;
+  if (view.revealed < view.text.length) {
+    window.clearTimeout(scene.timer);
+    scene.timer = undefined;
+    view.revealed = view.text.length;
+    draw();
+  } else {
+    stepScene(scene);
+  }
+}
+
+function playScenes(events: ScriptEvent[], done: () => void): void {
+  if (events.length === 0) {
+    done();
+    return;
+  }
+  scene = { queue: [...events], runner: null, timer: undefined, done };
+  stepScene(scene);
+}
+
+// Quand la partie est gagnée ou perdue, les scènes de fin passent avant l'écran de résultat.
+function settleOutcome(): void {
+  if (state.outcome === 'playing' || endHandled) return;
+  endHandled = true;
+  const trigger = state.outcome === 'victory' ? 'chapitre.victoire' : 'chapitre.defaite';
+  playScenes(takeEvents(CHAPTER1_EVENTS, state, trigger), () => {
+    fx.showOutcome = true;
+    draw();
+  });
+}
+
 // Phase ennemie : chaque ennemi joue à son tour (déplacement, puis attaque éventuelle).
 function runEnemyPhase(): void {
   if (enemyPhaseRunning) return;
@@ -92,6 +188,7 @@ function runEnemyPhase(): void {
     if (state.outcome !== 'playing') {
       enemyPhaseRunning = false;
       draw();
+      settleOutcome();
       return;
     }
     if (id === undefined) {
@@ -142,6 +239,7 @@ function play(playback: Playback | null): void {
     playEvents(playback.events, () => {
       finishAction(state, ui);
       draw();
+      settleOutcome();
       advance();
     });
   }
@@ -149,13 +247,17 @@ function play(playback: Playback | null): void {
 
 // Tour par tour : on ne redessine qu'après une action ou une étape de lecture.
 function dispatch(action: Action): void {
+  if (scene !== null) {
+    if (action.type === 'confirm') advanceScene(); // pendant une scène, seul le clic de validation compte
+    return;
+  }
   switch (action.type) {
     case 'setCursor':
       setCursor(state, ui, action.pos);
       break;
     case 'confirm':
       if (state.outcome !== 'playing') {
-        location.reload(); // partie terminée : un clic relance le chapitre
+        if (fx.showOutcome) location.reload(); // partie terminée : un clic relance le chapitre
         return;
       }
       play(confirm(state, ui, Math.random));
@@ -170,3 +272,4 @@ function dispatch(action: Action): void {
 
 attachMouse(canvas, dispatch);
 draw();
+playScenes(takeEvents(CHAPTER1_EVENTS, state, 'chapitre.debut'), draw);
