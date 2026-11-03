@@ -9,6 +9,8 @@ import { drawChoice, drawDialogue, drawHistory } from './dialogue.ts';
 import type { ChoiceView, DialogueView, HistoryView } from './dialogue.ts';
 import { drawBackButton, drawBanner, drawForecast, drawHud, drawInfoPanel, drawMenu, drawOutcome } from './panels.ts';
 import type { Banner } from './panels.ts';
+import { drawScreen } from './screens.ts';
+import type { ScreenView } from './screens.ts';
 
 // Effets ponctuels : lecture d'un combat, dialogue en cours, écran de fin.
 export interface Effects {
@@ -24,6 +26,7 @@ export interface Effects {
 
 export interface Renderer {
   draw(state: GameState, ui: UiState, fx: Effects): void;
+  drawScreen(view: ScreenView): void; // écran titre ou options, hors partie
 }
 
 const BACKGROUND = '#10131c'; // même couleur que la page, pour que le bord d'une petite carte se fonde dans le cadre
@@ -57,6 +60,11 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
   window.addEventListener('resize', fit);
 
   return {
+    drawScreen(view) {
+      ctx.fillStyle = BACKGROUND;
+      ctx.fillRect(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT);
+      drawScreen(ctx, view);
+    },
     draw(state, ui, fx) {
       // Fond hors de la carte (visible quand elle est plus petite que la vue), puis la carte décalée par la caméra.
       ctx.fillStyle = BACKGROUND;

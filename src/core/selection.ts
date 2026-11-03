@@ -9,7 +9,7 @@ import type { GameState, Pos, Unit } from './types.ts';
 
 export const MENU_WIDTH = 5; // en tuiles ; chaque entrée occupe une tuile de haut
 
-export type MenuItem = 'attack' | 'talk' | 'wait' | 'endTurn';
+export type MenuItem = 'attack' | 'talk' | 'wait' | 'endTurn' | 'options';
 
 export interface Menu {
   items: MenuItem[];
@@ -39,10 +39,12 @@ export interface UiState {
 
 // Ce que l'interface doit jouer à l'écran. L'état n'est pas encore modifié : c'est la lecture qui
 // le fait avancer (déplacement case par case, coup par coup), puis finishMove / finishAction conclut.
+// `options` n'a rien à jouer : le joueur a choisi d'ouvrir l'écran des options.
 export type Playback =
   | { type: 'move'; unitId: string; path: Pos[] }
   | { type: 'combat'; events: CombatEvent[] }
-  | { type: 'talk'; unitId: string; partnerId: string };
+  | { type: 'talk'; unitId: string; partnerId: string }
+  | { type: 'options' };
 
 export function createUiState(events: ScriptEvent[] = []): UiState {
   return {
@@ -94,8 +96,7 @@ export function confirm(state: GameState, ui: UiState, rng: Rng): Playback | nul
     case 'target':
       return confirmTarget(state, ui, rng);
     case 'system':
-      confirmSystem(state, ui);
-      return null;
+      return confirmSystem(state, ui);
     case 'busy':
       return null;
   }
@@ -201,7 +202,7 @@ function confirmIdle(state: GameState, ui: UiState): void {
   const target = unitAt(state, ui.cursor);
   if (target === undefined) {
     ui.mode = 'system';
-    openMenu(state, ui, ['endTurn'], ui.cursor);
+    openMenu(state, ui, ['endTurn', 'options'], ui.cursor);
   } else if (target.team === 'player' && !target.acted) {
     select(state, ui, target);
   }
@@ -265,8 +266,9 @@ function confirmTarget(state: GameState, ui: UiState, rng: Rng): Playback | null
   return { type: 'combat', events };
 }
 
-function confirmSystem(state: GameState, ui: UiState): void {
-  const endTurn = clickedItem(ui) === 'endTurn';
+function confirmSystem(state: GameState, ui: UiState): Playback | null {
+  const item = clickedItem(ui);
   resetUi(ui);
-  if (endTurn) endPlayerPhase(state);
+  if (item === 'endTurn') endPlayerPhase(state);
+  return item === 'options' ? { type: 'options' } : null;
 }

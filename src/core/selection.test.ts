@@ -83,7 +83,7 @@ test('idle : une case vide ouvre le menu système', () => {
   const { state, ui } = setup();
   click(state, ui, 5, 2);
   assert.equal(ui.mode, 'system');
-  assert.deepEqual(ui.menu?.items, ['endTurn']);
+  assert.deepEqual(ui.menu?.items, ['endTurn', 'options']);
 });
 
 test("move : une case atteignable lance le déplacement, le menu s'ouvre à l'arrivée", () => {
@@ -358,4 +358,14 @@ test('backButtonAt : les quatre tuiles du bouton, sur la rangée du haut seuleme
   assert.equal(backButtonAt({ x: x - 1, y }), false);
   assert.equal(backButtonAt({ x: x + width, y }), false);
   assert.equal(backButtonAt({ x, y: y + 1 }), false);
+});
+
+test("système : Options ferme le menu et demande l'écran des options, sans finir le tour", () => {
+  const { state, ui } = setup();
+  click(state, ui, 5, 2);
+
+  assert.deepEqual(clickItem(state, ui, 'options'), { type: 'options' });
+  assert.equal(ui.mode, 'idle');
+  assert.equal(ui.menu, null);
+  assert.equal(state.phase, 'player'); // le tour n'est pas fini
 });

@@ -16,6 +16,9 @@ import {
 } from './core/dialogue.ts';
 import type { Choice, DialogueRunner, Line, StageStep } from './core/dialogue.ts';
 import type { ScriptEvent, Trigger } from './core/script.ts';
+import { optionRowAt, titleButtonAt } from './core/screens.ts';
+import { DEFAULT_SETTINGS, animationMs, cycleSetting, textStepMs } from './core/settings.ts';
+import type { SettingKey } from './core/settings.ts';
 import { updateOutcome } from './core/objective.ts';
 import {
   MENU_WIDTH,
@@ -42,11 +45,11 @@ import type { DialogueView } from './render/dialogue.ts';
 import { objectiveText } from './render/panels.ts';
 import { createRenderer } from './render/renderer.ts';
 import type { Effects } from './render/renderer.ts';
+import { loadSettings, saveSettings } from './storage.ts';
 
 const MOVE_STEP_MS = 90;
 const COMBAT_STEP_MS = 600;
 const ENEMY_PAUSE_MS = 350;
-const TEXT_STEP_MS = 25;
 const STAGE_BEAT_MS = 500; // éclair et pause quand une unité apparaît ou change de camp
 const BANNER_MS = 2200; // durée de la bannière d'objectif
 const AUTO_DELAY_MS = 3000; // mode Auto : délai entre la fin de l'affichage d'une réplique et la suivante
@@ -72,9 +75,17 @@ interface LogEntry {
   key: string;
 }
 
-const language = detectLanguage();
-setLanguage(language);
-document.documentElement.lang = language;
+// Réglages du joueur : le choix enregistré d'abord, puis ?lang= et le navigateur pour la langue.
+let settings = loadSettings({ ...DEFAULT_SETTINGS, language: detectLanguage() });
+
+function applyLanguage(): void {
+  setLanguage(settings.language);
+  document.documentElement.lang = settings.language;
+}
+applyLanguage();
+
+// Durée d'une étape d'animation, selon la vitesse choisie dans les options.
+const animation = (ms: number): number => animationMs(settings, ms);
 
 const canvas = document.querySelector<HTMLCanvasElement>('#game');
 if (canvas === null) throw new Error('Canvas #game introuvable');
@@ -98,10 +109,18 @@ let enemyPhaseRunning = false;
 let endHandled = false;
 let dialogue: ActiveDialogue | null = null;
 let autoMode = false; // gardé pendant la session, pas entre deux chargements de la page
+
+// Écran affiché : le titre au chargement, la partie, ou les options (ouvertes depuis l'un ou l'autre).
+let scene: 'title' | 'options' | 'game' = 'title';
+let optionsFrom: 'title' | 'game' = 'title';
 const log: LogEntry[] = [];
 const pendingDeaths: string[] = []; // unités tombées dont le dialogue de mort n'a pas encore été joué
 
-const draw = (): void => renderer.draw(state, ui, fx);
+const draw = (): void => {
+  if (scene === 'game') renderer.draw(state, ui, fx);
+  else if (scene === 'title') renderer.drawScreen({ kind: 'title', pointer: ui.pointer });
+  else renderer.drawScreen({ kind: 'options', pointer: ui.pointer, settings });
+};
 
 // La case de la carte visée suit le pointeur : elle change avec lui, et aussi quand la caméra bouge sous lui.
 function pointTo(pos: Pos): void {
@@ -172,7 +191,7 @@ function playEvents(events: CombatEvent[], done: () => void): void {
     }
     showEvent(event);
     draw();
-    setTimeout(step, COMBAT_STEP_MS);
+    setTimeout(step, animation(COMBAT_STEP_MS));
   };
   step();
 }
@@ -189,7 +208,7 @@ function playMove(unit: Unit, path: Pos[], done: () => void): void {
     unit.pos = pos;
     follow(pos);
     draw();
-    setTimeout(step, MOVE_STEP_MS);
+    setTimeout(step, animation(MOVE_STEP_MS));
   };
   step();
 }
@@ -244,17 +263,18 @@ function startLine(active: ActiveDialogue, line: Line, eventId: string): void {
   const view = lineView(line, 0);
   const text = view.text;
   fx.dialogue = view;
+  const stepMs = textStepMs(settings); // 0 : tout le texte d'un coup
   const type = (): void => {
-    view.revealed += 1;
+    view.revealed = stepMs === 0 ? text.length : view.revealed + 1;
     draw();
     if (view.revealed < text.length) {
-      active.timer = window.setTimeout(type, TEXT_STEP_MS);
+      active.timer = window.setTimeout(type, stepMs);
     } else {
       active.timer = undefined;
       scheduleAuto(active);
     }
   };
-  active.timer = window.setTimeout(type, TEXT_STEP_MS);
+  active.timer = window.setTimeout(type, stepMs);
   draw();
 }
 
@@ -302,7 +322,7 @@ function playStage(active: ActiveDialogue, step: StageStep): void {
     if (unit !== undefined) follow(unit.pos);
     fx.flashId = step.unitId;
     draw();
-    window.setTimeout(finish, STAGE_BEAT_MS);
+    window.setTimeout(finish, animation(STAGE_BEAT_MS));
   }
 }
 
@@ -570,13 +590,13 @@ function playEnemies(): void {
       const target = state.units.find((other) => other.id === action.targetId);
       if (target === undefined) {
         unit.acted = true;
-        setTimeout(next, ENEMY_PAUSE_MS);
+        setTimeout(next, animation(ENEMY_PAUSE_MS));
         return;
       }
       playEvents(resolveCombat(state, unit, target, Math.random), () => {
         unit.acted = true;
         draw();
-        playDeaths(() => setTimeout(next, ENEMY_PAUSE_MS));
+        playDeaths(() => setTimeout(next, animation(ENEMY_PAUSE_MS)));
       });
     });
   };
@@ -629,11 +649,67 @@ function play(playback: Playback | null): void {
       settleOutcome();
       advance();
     });
+  } else if (playback?.type === 'options') {
+    openOptions('game');
   }
+}
+
+function openOptions(from: 'title' | 'game'): void {
+  optionsFrom = from;
+  scene = 'options';
+}
+
+function closeOptions(): void {
+  scene = optionsFrom;
+  if (scene === 'game') pointTo(ui.pointer); // le curseur de la carte reprend la case sous le pointeur
+}
+
+function changeSetting(key: SettingKey): void {
+  settings = cycleSetting(settings, key);
+  saveSettings(settings);
+  if (key === 'language') applyLanguage();
+}
+
+function startChapter(): void {
+  scene = 'game';
+  draw();
+  playTriggers(['chapitre.debut'], () => playTriggers(['tour.joueur(1)'], () => showBanner('objective.title', draw)));
+}
+
+// Écrans titre et options : seuls le pointeur, la validation et l'annulation y répondent.
+function handleScreenAction(action: Action): void {
+  switch (action.type) {
+    case 'pointer':
+      ui.pointer = action.pos;
+      break;
+    case 'confirm':
+      if (scene === 'title') {
+        const button = titleButtonAt(ui.pointer);
+        if (button === 'new') startChapter();
+        else if (button === 'options') openOptions('title');
+      } else {
+        const row = optionRowAt(ui.pointer);
+        if (row === 'back') closeOptions();
+        else if (row !== undefined) changeSetting(row);
+      }
+      break;
+    case 'cancel':
+      if (scene === 'options') closeOptions();
+      break;
+    case 'scroll':
+    case 'pan':
+    case 'drag':
+      return;
+  }
+  draw();
 }
 
 // Tour par tour : on ne redessine qu'après une action ou une étape de lecture.
 function dispatch(action: Action): void {
+  if (scene !== 'game') {
+    handleScreenAction(action);
+    return;
+  }
   if (dialogue !== null) {
     handleDialogueAction(dialogue, action);
     return;
@@ -682,4 +758,3 @@ function dispatch(action: Action): void {
 
 attachPointer(canvas, dispatch);
 draw();
-playTriggers(['chapitre.debut'], () => playTriggers(['tour.joueur(1)'], () => showBanner('objective.title', draw)));
