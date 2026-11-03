@@ -145,6 +145,9 @@ export function applyEvent(state: GameState, event: CombatEvent): void {
     const target = state.units.find((unit) => unit.id === event.targetId);
     if (target !== undefined) target.hp = event.targetHp;
   } else {
+    const dead = state.units.find((unit) => unit.id === event.unitId);
     state.units = state.units.filter((unit) => unit.id !== event.unitId);
+    if (dead?.role === 'lord') state.outcome = 'defeat';
+    else if (dead?.role === 'boss' && state.outcome === 'playing') state.outcome = 'victory';
   }
 }

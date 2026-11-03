@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { stateFromRows, tileIndex } from './grid.ts';
-import { reachableTiles } from './movement.ts';
+import { costField, pathTo, reachableTiles } from './movement.ts';
 import { makeUnit } from './test-helpers.ts';
 import type { ClassId, GameState, Team, Unit } from './types.ts';
 
@@ -50,6 +50,35 @@ test('un mur est infranchissable et on le contourne si possible', () => {
 
   const blocked = stateFromRows(['..#..'], [mover]);
   assert.equal(costAt(blocked, reachableTiles(blocked, mover), 3, 0), undefined);
+});
+
+test('pathTo renvoie le chemin case par case, départ exclu', () => {
+  const mover = unit('a', 'player', 'swordsman', 0, 0);
+  const state = stateFromRows(['.....'], [mover]);
+  assert.deepEqual(pathTo(state, mover, { x: 3, y: 0 }), [{ x: 1, y: 0 }, { x: 2, y: 0 }, { x: 3, y: 0 }]);
+});
+
+test('pathTo contourne un mur', () => {
+  const mover = unit('a', 'player', 'swordsman', 0, 0);
+  const state = stateFromRows(['.#.', '...'], [mover]);
+  assert.deepEqual(pathTo(state, mover, { x: 2, y: 0 }), [{ x: 0, y: 1 }, { x: 1, y: 1 }, { x: 2, y: 1 }, { x: 2, y: 0 }]);
+});
+
+test("pathTo est vide si l'unité reste sur place ou si la case est hors de portée", () => {
+  const mover = unit('a', 'player', 'swordsman', 0, 0);
+  const state = stateFromRows(['.......'], [mover]);
+  assert.deepEqual(pathTo(state, mover, { x: 0, y: 0 }), []);
+  assert.deepEqual(pathTo(state, mover, { x: 6, y: 0 }), []);
+});
+
+test('costField : coût du terrain pour rejoindre le but, sans traverser les murs', () => {
+  const mover = unit('a', 'player', 'swordsman', 0, 0);
+  const state = stateFromRows(['..f.', '###.'], [mover]);
+  const field = costField(state, { x: 0, y: 0 });
+  assert.equal(field.get(tileIndex(state, { x: 0, y: 0 })), 0);
+  assert.equal(field.get(tileIndex(state, { x: 1, y: 0 })), 1);
+  assert.equal(field.get(tileIndex(state, { x: 3, y: 0 })), 4); // entre en forêt (2), plaine (1), but (1)
+  assert.equal(field.get(tileIndex(state, { x: 3, y: 1 })), 5);
 });
 
 test('un ennemi bloque le passage', () => {

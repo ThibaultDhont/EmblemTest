@@ -9,6 +9,15 @@ export type ClassId = 'swordsman' | 'lancer' | 'archer' | 'fighter';
 export type WeaponType = 'sword' | 'lance' | 'axe' | 'bow';
 export type WeaponId = 'ironSword' | 'ironLance' | 'ironAxe' | 'ironBow';
 
+// Seigneur : sa mort fait perdre. Boss : sa mort fait gagner.
+export type Role = 'lord' | 'boss';
+
+// charge : attaque ou avance vers le joueur · guard : attaque seulement ce qu'il peut atteindre,
+// sans quitter son poste sinon · stationary : n'attaque que ce qui est à portée de sa case.
+export type AiProfile = 'charge' | 'guard' | 'stationary';
+
+export type Outcome = 'playing' | 'victory' | 'defeat';
+
 export interface Stats {
   maxHp: number;
   str: number; // Force
@@ -26,7 +35,9 @@ export interface Unit {
   stats: Stats;
   hp: number;
   weaponId: WeaponId;
-  acted: boolean; // a déjà agi pendant le tour en cours
+  acted: boolean; // a déjà agi pendant la phase en cours
+  role?: Role;
+  ai?: AiProfile; // profil des unités ennemies, 'charge' par défaut
 }
 
 // État de partie : données pures, sérialisables avec JSON.stringify, sans lien avec le DOM.
@@ -36,4 +47,6 @@ export interface GameState {
   tiles: TerrainId[]; // ligne par ligne : index = y * width + x
   units: Unit[];
   turn: number;
+  phase: Team; // camp qui joue
+  outcome: Outcome;
 }

@@ -38,6 +38,7 @@ export function drawInfoPanel(ctx: CanvasRenderingContext2D, state: GameState, u
   const unit = unitAt(state, ui.cursor);
   if (unit !== undefined) {
     lines.push(t('panel.unit', { class: t(`class.${unit.classId}`), mov: CLASSES[unit.classId].mov }));
+    if (unit.role !== undefined) lines.push(t(`role.${unit.role}`));
     lines.push(t('panel.hp', { hp: unit.hp, max: unit.stats.maxHp, weapon: t(`weapon.${unit.weaponId}`) }));
   }
 
@@ -109,9 +110,25 @@ export function drawForecast(ctx: CanvasRenderingContext2D, state: GameState, ui
 }
 
 export function drawHud(ctx: CanvasRenderingContext2D, state: GameState): void {
-  const text = t('hud.turn', { turn: state.turn });
+  const text = t(state.phase === 'enemy' ? 'hud.enemyPhase' : 'hud.turn', { turn: state.turn });
   setText(ctx);
   drawBox(ctx, 4, SCREEN_HEIGHT - 14, textWidth(ctx, [text]) + 8, 10);
   ctx.fillStyle = '#ffffff';
   ctx.fillText(text, 8, SCREEN_HEIGHT - 12);
+}
+
+// Écran de fin de partie : voile sombre, titre et invitation à rejouer.
+export function drawOutcome(ctx: CanvasRenderingContext2D, state: GameState): void {
+  if (state.outcome === 'playing') return;
+  ctx.fillStyle = 'rgba(10, 14, 30, 0.65)';
+  ctx.fillRect(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT);
+
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.font = 'bold 16px monospace';
+  ctx.fillStyle = state.outcome === 'victory' ? '#ffd24d' : '#ff6a5f';
+  ctx.fillText(t(`outcome.${state.outcome}`), SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2 - 8);
+  ctx.font = '8px monospace';
+  ctx.fillStyle = '#ffffff';
+  ctx.fillText(t('outcome.retry'), SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2 + 12);
 }

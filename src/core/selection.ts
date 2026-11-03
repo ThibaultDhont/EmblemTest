@@ -1,8 +1,8 @@
 import { resolveCombat, targetsInRange } from './combat.ts';
 import type { CombatEvent, Rng } from './combat.ts';
 import { inBounds, tileIndex, unitAt } from './grid.ts';
-import { reachableTiles } from './movement.ts';
-import { endTurn } from './turn.ts';
+import { pathTo, reachableTiles } from './movement.ts';
+import { endPlayerPhase } from './turn.ts';
 import type { GameState, Pos, Unit } from './types.ts';
 
 export const MENU_WIDTH = 5; // en tuiles ; chaque entrée occupe une tuile de haut
@@ -16,7 +16,7 @@ export interface Menu {
 }
 
 // idle : rien de sélectionné · move : unité choisie, zone bleue · menu : Attaquer / Attendre
-// target : choix de la cible · busy : combat en cours de lecture · system : menu Fin de tour
+// target : choix de la cible · busy : déplacement ou combat en cours de lecture · system : menu Fin de tour
 export type Mode = 'idle' | 'move' | 'menu' | 'target' | 'busy' | 'system';
 
 // État de l'interface, hors GameState.
@@ -29,6 +29,12 @@ export interface UiState {
   menu: Menu | null;
   targets: string[]; // ids des ennemis attaquables, en mode 'target'
 }
+
+// Ce que l'interface doit jouer à l'écran. L'état n'est pas encore modifié : c'est la lecture qui
+// le fait avancer (déplacement case par case, coup par coup), puis finishMove / finishAction conclut.
+export type Playback =
+  | { type: 'move'; unitId: string; path: Pos[] }
+  | { type: 'combat'; events: CombatEvent[] };
 
 export function createUiState(): UiState {
   return { cursor: { x: 0, y: 0 }, mode: 'idle', selectedId: null, origin: null, reachable: new Map(), menu: null, targets: [] };
@@ -43,35 +49,39 @@ export function setCursor(state: GameState, ui: UiState, pos: Pos): void {
   if (inBounds(state, pos)) ui.cursor = pos;
 }
 
-// Renvoie les événements d'un combat à jouer (liste vide dans tous les autres cas).
-export function confirm(state: GameState, ui: UiState, rng: Rng): CombatEvent[] {
+// Le joueur ne peut agir que pendant sa phase et tant que la partie n'est pas terminée.
+function canPlay(state: GameState): boolean {
+  return state.phase === 'player' && state.outcome === 'playing';
+}
+
+export function confirm(state: GameState, ui: UiState, rng: Rng): Playback | null {
+  if (!canPlay(state)) return null;
   switch (ui.mode) {
     case 'idle':
       confirmIdle(state, ui);
-      break;
+      return null;
     case 'move':
-      confirmMove(state, ui);
-      break;
+      return confirmMove(state, ui);
     case 'menu':
       confirmMenu(state, ui);
-      break;
+      return null;
     case 'target':
       return confirmTarget(state, ui, rng);
     case 'system':
       confirmSystem(state, ui);
-      break;
+      return null;
     case 'busy':
-      break;
+      return null;
   }
-  return [];
 }
 
 export function cancel(state: GameState, ui: UiState): void {
+  if (!canPlay(state)) return;
   const unit = selectedUnit(state, ui);
   switch (ui.mode) {
     case 'move':
     case 'system':
-      reset(ui);
+      resetUi(ui);
       break;
     case 'menu':
       if (unit !== undefined && ui.origin !== null) {
@@ -88,12 +98,27 @@ export function cancel(state: GameState, ui: UiState): void {
   }
 }
 
-// Termine l'action de l'unité sélectionnée (si elle a survécu) ; le tour finit quand tout le monde a agi.
+// Appelé quand le déplacement a fini d'être joué : l'unité est arrivée, le menu s'ouvre.
+export function finishMove(state: GameState, ui: UiState): void {
+  const unit = selectedUnit(state, ui);
+  if (unit !== undefined) openActionMenu(state, ui, unit);
+}
+
+// Termine l'action de l'unité sélectionnée (si elle a survécu) ; la phase finit quand tout le monde a agi.
 export function finishAction(state: GameState, ui: UiState): void {
   const unit = selectedUnit(state, ui);
   if (unit !== undefined) unit.acted = true;
-  reset(ui);
-  if (state.units.filter((other) => other.team === 'player').every((other) => other.acted)) endTurn(state);
+  resetUi(ui);
+  if (state.units.filter((other) => other.team === 'player').every((other) => other.acted)) endPlayerPhase(state);
+}
+
+export function resetUi(ui: UiState): void {
+  ui.mode = 'idle';
+  ui.selectedId = null;
+  ui.origin = null;
+  ui.reachable = new Map();
+  ui.menu = null;
+  ui.targets = [];
 }
 
 function selectedUnit(state: GameState, ui: UiState): Unit | undefined {
@@ -104,17 +129,8 @@ function clickedItem(ui: UiState): MenuItem | undefined {
   return ui.menu === null ? undefined : menuItemAt(ui.menu, ui.cursor);
 }
 
-function reset(ui: UiState): void {
-  ui.mode = 'idle';
-  ui.selectedId = null;
-  ui.origin = null;
-  ui.reachable = new Map();
-  ui.menu = null;
-  ui.targets = [];
-}
-
 function select(state: GameState, ui: UiState, unit: Unit): void {
-  reset(ui);
+  resetUi(ui);
   ui.mode = 'move';
   ui.selectedId = unit.id;
   ui.origin = unit.pos;
@@ -155,17 +171,22 @@ function confirmIdle(state: GameState, ui: UiState): void {
   }
 }
 
-function confirmMove(state: GameState, ui: UiState): void {
+function confirmMove(state: GameState, ui: UiState): Playback | null {
   const unit = selectedUnit(state, ui);
-  if (unit === undefined) return;
+  if (unit === undefined) return null;
   if (ui.reachable.has(tileIndex(state, ui.cursor))) {
-    unit.pos = ui.cursor;
+    const path = pathTo(state, unit, ui.cursor);
     ui.reachable = new Map();
-    openActionMenu(state, ui, unit);
-    return;
+    if (path.length === 0) {
+      openActionMenu(state, ui, unit); // l'unité reste sur place : rien à jouer
+      return null;
+    }
+    ui.mode = 'busy';
+    return { type: 'move', unitId: unit.id, path };
   }
   const target = unitAt(state, ui.cursor);
   if (target?.team === 'player' && !target.acted) select(state, ui, target);
+  return null;
 }
 
 function confirmMenu(state: GameState, ui: UiState): void {
@@ -181,16 +202,18 @@ function confirmMenu(state: GameState, ui: UiState): void {
   }
 }
 
-function confirmTarget(state: GameState, ui: UiState, rng: Rng): CombatEvent[] {
+function confirmTarget(state: GameState, ui: UiState, rng: Rng): Playback | null {
   const unit = selectedUnit(state, ui);
   const target = unitAt(state, ui.cursor);
-  if (unit === undefined || target === undefined || !ui.targets.includes(target.id)) return [];
+  if (unit === undefined || target === undefined || !ui.targets.includes(target.id)) return null;
   const events = resolveCombat(state, unit, target, rng);
-  if (events.length > 0) ui.mode = 'busy';
-  return events;
+  if (events.length === 0) return null;
+  ui.mode = 'busy';
+  return { type: 'combat', events };
 }
 
 function confirmSystem(state: GameState, ui: UiState): void {
-  if (clickedItem(ui) === 'endTurn') endTurn(state);
-  reset(ui);
+  const endTurn = clickedItem(ui) === 'endTurn';
+  resetUi(ui);
+  if (endTurn) endPlayerPhase(state);
 }

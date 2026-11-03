@@ -153,6 +153,20 @@ test('pas de riposte hors de portée : un seul coup', () => {
   assert.equal(events.length, 1);
 });
 
+test('la mort du seigneur fait perdre, celle du boss fait gagner, une autre mort ne change rien', () => {
+  const lord = duel({ role: 'lord' });
+  applyEvent(lord.state, { type: 'death', unitId: 'a' });
+  assert.equal(lord.state.outcome, 'defeat');
+
+  const boss = duel({}, { role: 'boss' });
+  applyEvent(boss.state, { type: 'death', unitId: 'd' });
+  assert.equal(boss.state.outcome, 'victory');
+
+  const other = duel();
+  applyEvent(other.state, { type: 'death', unitId: 'd' });
+  assert.equal(other.state.outcome, 'playing');
+});
+
 test('applyEvent met à jour les PV et retire les morts', () => {
   const { state, attacker, defender } = duel();
   applyEvent(state, { type: 'strike', attackerId: 'a', targetId: 'd', hit: true, crit: false, damage: 8, targetHp: 12 });

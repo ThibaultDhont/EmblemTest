@@ -3,7 +3,7 @@ import { tilesInRange } from '../core/combat.ts';
 import { posOf } from '../core/grid.ts';
 import type { UiState } from '../core/selection.ts';
 import type { ClassId, GameState, Pos, TerrainId, Team, Unit } from '../core/types.ts';
-import { drawForecast, drawHud, drawInfoPanel, drawMenu } from './panels.ts';
+import { drawForecast, drawHud, drawInfoPanel, drawMenu, drawOutcome } from './panels.ts';
 
 // Effets ponctuels pendant la lecture d'un combat.
 export interface Effects {
@@ -64,6 +64,7 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
       if (ui.mode === 'idle' || ui.mode === 'move') drawInfoPanel(ctx, state, ui);
       if (ui.menu !== null) drawMenu(ctx, ui, ui.menu);
       if (ui.mode === 'target') drawForecast(ctx, state, ui);
+      drawOutcome(ctx, state);
     },
   };
 }
@@ -124,7 +125,8 @@ function drawOverlay(ctx: CanvasRenderingContext2D, state: GameState, indices: I
 function drawUnit(ctx: CanvasRenderingContext2D, unit: Unit, flashing: boolean): void {
   const x = unit.pos.x * TILE_SIZE;
   const y = unit.pos.y * TILE_SIZE;
-  ctx.fillStyle = '#101010';
+  // Bordure dorée pour le seigneur, violette pour le boss.
+  ctx.fillStyle = unit.role === 'lord' ? '#f2d04b' : unit.role === 'boss' ? '#b04bd0' : '#101010';
   ctx.fillRect(x + 1, y + 1, 14, 11);
   ctx.fillStyle = TEAM_COLOR[unit.team];
   ctx.fillRect(x + 2, y + 2, 12, 9);

@@ -7,6 +7,8 @@
   "class.lancer": "Lancer",
   "class.archer": "Archer",
   "class.fighter": "Fighter",
+  "role.lord": "Lord",
+  "role.boss": "Boss",
   "weapon.ironSword": "Iron Sword",
   "weapon.ironLance": "Iron Lance",
   "weapon.ironAxe": "Iron Axe",
@@ -22,5 +24,9 @@
   "forecast.hit": "Hit",
   "forecast.crit": "Crit",
   "combat.miss": "Miss",
-  "hud.turn": "Turn {turn}"
+  "hud.turn": "Turn {turn}",
+  "hud.enemyPhase": "Turn {turn} · Enemy phase",
+  "outcome.victory": "Victory!",
+  "outcome.defeat": "Defeat",
+  "outcome.retry": "Click to play again"
 }
