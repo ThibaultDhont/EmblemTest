@@ -86,6 +86,22 @@ test('les commandes de mise en scène visent des unités du chapitre et des case
   }
 });
 
+test("les déclencheurs d'actions du joueur visent des unités et des cases praticables du chapitre", () => {
+  const chapter = createChapter1();
+  const ids = new Set([...chapter.units, ...chapter.reserve].map((unit) => unit.id));
+  for (const { trigger } of events) {
+    const named = /^(?:selection|attaque)\((.+)\)$/.exec(trigger);
+    if (named !== null) assert.ok(ids.has(named[1] ?? ''), `unité inconnue : ${trigger}`);
+
+    const place = /^case\((?:([a-z][a-z0-9-]*),)?(\d+),(\d+)\)$/.exec(trigger);
+    if (place === null) continue;
+    if (place[1] !== undefined) assert.ok(ids.has(place[1]), `unité inconnue : ${trigger}`);
+    const pos = { x: Number(place[2]), y: Number(place[3]) };
+    assert.ok(inBounds(chapter, pos), `case hors de la carte : ${trigger}`);
+    assert.notEqual(terrainAt(chapter, pos), 'wall', `case dans un mur : ${trigger}`);
+  }
+});
+
 test('chaque unité de réserve est appelée par un @apparait', () => {
   const spawned = new Set(commands.flatMap((command) => (command.op === 'spawn' ? [command.unit] : [])));
   const forgotten = createChapter1().reserve.filter((unit) => !spawned.has(unit.id));

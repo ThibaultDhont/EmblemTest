@@ -17,6 +17,7 @@ import type { Choice, DialogueRunner, Line, StageStep } from './core/dialogue.ts
 import type { ScriptEvent, Trigger } from './core/script.ts';
 import { cancel, confirm, createUiState, finishAction, finishMove, resetUi, setCursor } from './core/selection.ts';
 import type { Playback } from './core/selection.ts';
+import { arrivalTriggers, attackTrigger, selectionTrigger } from './core/triggers.ts';
 import { endEnemyPhase } from './core/turn.ts';
 import type { Pos, Unit } from './core/types.ts';
 import { CHAPTER1_EVENTS } from './data/chapter1.events.ts';
@@ -531,19 +532,27 @@ function play(playback: Playback | null): void {
   if (playback?.type === 'move') {
     const unit = state.units.find((other) => other.id === playback.unitId);
     if (unit === undefined) return;
+    // Arrivée : les dialogues de la case se jouent après l'animation, avant que le menu d'actions s'ouvre.
     playMove(unit, playback.path, () => {
-      finishMove(state, ui);
-      draw();
-    });
-  } else if (playback?.type === 'combat') {
-    playEvents(playback.events, () => {
-      finishAction(state, ui);
-      draw();
-      playDeaths(() => {
-        settleOutcome();
-        advance();
+      playTriggers(arrivalTriggers(unit, unit.pos), () => {
+        finishMove(state, ui);
+        draw();
       });
     });
+  } else if (playback?.type === 'combat') {
+    const fight = (): void =>
+      playEvents(playback.events, () => {
+        finishAction(state, ui);
+        draw();
+        playDeaths(() => {
+          settleOutcome();
+          advance();
+        });
+      });
+    // Le premier coup est celui de l'attaquant : son dialogue passe avant que le combat ne se joue.
+    const first = playback.events[0];
+    if (first?.type === 'strike') playTriggers([attackTrigger(first.targetId)], fight);
+    else fight();
   }
 }
 
@@ -562,7 +571,12 @@ function dispatch(action: Action): void {
         if (fx.showOutcome) location.reload(); // partie terminée : un clic relance le chapitre
         return;
       }
-      play(confirm(state, ui, Math.random));
+      {
+        const selectedBefore = ui.selectedId;
+        play(confirm(state, ui, Math.random));
+        // Sélectionner une unité peut déclencher un dialogue ; la zone de déplacement reste affichée dessous.
+        if (ui.selectedId !== null && ui.selectedId !== selectedBefore) playTriggers([selectionTrigger(ui.selectedId)], draw);
+      }
       break;
     case 'cancel':
       cancel(state, ui);

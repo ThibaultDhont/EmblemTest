@@ -54,8 +54,27 @@ test('les déclencheurs de tour et de mort prennent un paramètre', () => {
   );
 });
 
+test("les déclencheurs d'actions du joueur sont reconnus", () => {
+  const events = parseScript(`
+    @event a quand selection(anna)
+      anna: x.1
+    @event b quand attaque(e2)
+      anna: x.2
+    @event c quand case(6,7)
+      anna: x.3
+    @event d quand case(marc,0,15)
+      anna: x.4
+  `);
+  assert.deepEqual(
+    events.map((event) => event.trigger),
+    ['selection(anna)', 'attaque(e2)', 'case(6,7)', 'case(marc,0,15)'],
+  );
+});
+
 test('un déclencheur mal formé est refusé', () => {
-  for (const trigger of ['jamais', 'tour.joueur(0)', 'tour.joueur(x)', 'tour.joueur', 'mort()', 'mort(Brutus)', 'tour.autre(1)']) {
+  const invalid = ['jamais', 'tour.joueur(0)', 'tour.joueur(x)', 'tour.joueur', 'mort()', 'mort(Brutus)', 'tour.autre(1)'];
+  invalid.push('selection()', 'attaque(Brutus)', 'case(1)', 'case(-1,2)', 'case(1,2,3)', 'case(a,b,c)', 'case(a,1)');
+  for (const trigger of invalid) {
     assert.throws(() => parseScript(`@event a quand ${trigger}`), /Ligne 1 : .*déclencheur/, trigger);
   }
 });

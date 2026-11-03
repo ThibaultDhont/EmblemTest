@@ -4,13 +4,20 @@ export type Side = 'gauche' | 'droite';
 
 // Quand un événement se déclenche. `tour.joueur(N)` : début de la phase joueur du tour N ;
 // `tour.ennemi(N)` : début de la phase ennemie ; `mort(id)` : l'unité `id` vient de tomber.
+// Actions du joueur : `selection(id)` : il sélectionne cette unité ; `attaque(id)` : il attaque cette unité
+// (avant le combat) ; `case(x,y)` : l'une de ses unités s'arrête sur cette case après un déplacement ;
+// `case(id,x,y)` : la même chose pour cette unité seulement.
 export type Trigger =
   | 'chapitre.debut'
   | 'chapitre.victoire'
   | 'chapitre.defaite'
   | `tour.joueur(${number})`
   | `tour.ennemi(${number})`
-  | `mort(${string})`;
+  | `mort(${string})`
+  | `selection(${string})`
+  | `attaque(${string})`
+  | `case(${number},${number})`
+  | `case(${string},${number},${number})`;
 
 export type ComparisonOp = '==' | '>=' | '<=' | '>' | '<';
 
@@ -61,7 +68,15 @@ export class ScriptError extends Error {
 const NAME = '[a-z][a-z0-9-]*';
 const NAME_ONLY = new RegExp(`^${NAME}$`);
 const TRIGGER = new RegExp(
-  `^(chapitre\\.(debut|victoire|defaite)|tour\\.(joueur|ennemi)\\([1-9][0-9]*\\)|mort\\(${NAME}\\))$`,
+  '^(' +
+    [
+      'chapitre\\.(debut|victoire|defaite)',
+      'tour\\.(joueur|ennemi)\\([1-9][0-9]*\\)',
+      `(mort|selection|attaque)\\(${NAME}\\)`,
+      'case\\([0-9]+,[0-9]+\\)',
+      `case\\(${NAME},[0-9]+,[0-9]+\\)`,
+    ].join('|') +
+    ')$',
 );
 const TEST = new RegExp(`^(vivant|mort|drapeau)\\((${NAME})\\)$`);
 const SAY = /^([a-z][a-z0-9-]*)\s*:\s*([A-Za-z0-9][\w.-]*)$/;
@@ -103,7 +118,8 @@ export function parseScript(text: string): ScriptEvent[] {
         throw new ScriptError(
           lineNumber,
           'syntaxe attendue « @event <nom> quand <déclencheur> », avec un déclencheur parmi : ' +
-            'chapitre.debut, chapitre.victoire, chapitre.defaite, tour.joueur(N), tour.ennemi(N), mort(id)',
+            'chapitre.debut, chapitre.victoire, chapitre.defaite, tour.joueur(N), tour.ennemi(N), mort(id), ' +
+            'selection(id), attaque(id), case(x,y), case(id,x,y)',
         );
       }
       if (events.some((event) => event.id === id)) throw new ScriptError(lineNumber, `l'événement « ${id} » existe déjà`);

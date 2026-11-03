@@ -21,6 +21,19 @@
       marc: ch1.choix.observe.reponse
   @fin
 
+# Mini-tutoriel : la première fois qu'on sélectionne Anna (voix neutre, pour ne dépendre de personne).
+@event tuto-selection quand selection(anna)
+  narration: ch1.tuto.selection
+
+# Premier ordre d'attaque contre le lancier e2 : le dialogue passe avant que le combat se joue.
+@event premiere-attaque-lancier quand attaque(e2)
+  @montre anna gauche
+  anna: ch1.attaque.e2
+
+# Une unité qui s'arrête dans l'enclos de pierre y trouve une cachette.
+@event cachette quand case(6,7)
+  narration: ch1.cachette.1
+
 # Au début de la phase ennemie du tour 2, tant que le boss est debout.
 @event pressentiment quand tour.ennemi(2)
   @montre marc droite
