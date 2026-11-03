@@ -25,14 +25,32 @@
 @event tuto-selection quand selection(anna)
   narration: ch1.tuto.selection
 
-# Premier ordre d'attaque contre le lancier e2 : le dialogue passe avant que le combat se joue.
-@event premiere-attaque-lancier quand attaque(e2)
+# Premier ordre d'attaque contre le lancier Gus : le dialogue passe avant que le combat se joue.
+@event premiere-attaque-lancier quand attaque(gus)
   @montre anna gauche
   anna: ch1.attaque.e2
 
 # Une unité qui s'arrête dans l'enclos de pierre y trouve une cachette.
 @event cachette quand case(6,7)
   narration: ch1.cachette.1
+
+# « Parler » : une conversation entre Anna et Marc, quand Anna s'arrête à côté de lui. Sans effet sur la partie.
+@event anna-marc quand parler(anna,marc)
+  @montre anna gauche
+  @montre marc droite
+  anna: ch1.parler.anna-marc.1
+  marc: ch1.parler.anna-marc.2
+
+# Recrutement par la parole : Anna au contact de Gus le fait passer de son côté.
+@event recruter-gus quand parler(anna,gus)
+  @montre anna gauche
+  @montre gus droite
+  anna: ch1.parler.gus.1
+  gus: ch1.parler.gus.2
+  anna: ch1.parler.gus.3
+  @recrute gus
+  @drapeau gus-recrute
+  gus: ch1.parler.gus.4
 
 # Au début de la phase ennemie du tour 2, tant que le boss est debout.
 @event pressentiment quand tour.ennemi(2)
@@ -41,13 +59,17 @@
     marc: ch1.pressentiment.1
   @fin
 
-# Au début du tour 3, la réplique dépend de ce qui est arrivé au lancier.
+# Au début du tour 3, la réplique dépend de ce qui est arrivé au lancier : recruté, vaincu, ou toujours là.
 @event point-tour3 quand tour.joueur(3)
   @montre marc gauche
-  @si mort(e2)
-    marc: ch1.tour3.mort
+  @si drapeau(gus-recrute)
+    marc: ch1.tour3.gus
   @sinon
-    marc: ch1.tour3.vivant
+    @si mort(gus)
+      marc: ch1.tour3.mort
+    @sinon
+      marc: ch1.tour3.vivant
+    @fin
   @fin
   @si drapeau(prudent)
     marc: ch1.tour3.prudent

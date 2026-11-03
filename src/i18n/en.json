@@ -17,6 +17,7 @@
   "panel.hp": "HP {hp}/{max} · {weapon}",
   "panel.terrainBonus": "Def +{def} Avo +{avoid}",
   "menu.attack": "Attack",
+  "menu.talk": "Talk",
   "menu.wait": "Wait",
   "menu.endTurn": "End turn",
   "forecast.hp": "HP",

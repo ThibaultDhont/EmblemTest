@@ -2,12 +2,14 @@ import { resolveCombat, targetsInRange } from './combat.ts';
 import type { CombatEvent, Rng } from './combat.ts';
 import { inBounds, tileIndex, unitAt } from './grid.ts';
 import { pathTo, reachableTiles } from './movement.ts';
+import type { ScriptEvent } from './script.ts';
+import { talkPartners } from './triggers.ts';
 import { endPlayerPhase } from './turn.ts';
 import type { GameState, Pos, Unit } from './types.ts';
 
 export const MENU_WIDTH = 5; // en tuiles ; chaque entrée occupe une tuile de haut
 
-export type MenuItem = 'attack' | 'wait' | 'endTurn';
+export type MenuItem = 'attack' | 'talk' | 'wait' | 'endTurn';
 
 export interface Menu {
   items: MenuItem[];
@@ -15,8 +17,9 @@ export interface Menu {
   y: number;
 }
 
-// idle : rien de sélectionné · move : unité choisie, zone bleue · menu : Attaquer / Attendre
-// target : choix de la cible · busy : déplacement ou combat en cours de lecture · system : menu Fin de tour
+// idle : rien de sélectionné · move : unité choisie, zone bleue · menu : Attaquer / Parler / Attendre
+// target : choix de la cible (ou de l'interlocuteur) · busy : déplacement, combat ou conversation en cours
+// de lecture · system : menu Fin de tour
 export type Mode = 'idle' | 'move' | 'menu' | 'target' | 'busy' | 'system';
 
 // État de l'interface, hors GameState.
@@ -27,17 +30,30 @@ export interface UiState {
   origin: Pos | null; // position de l'unité avant son déplacement, pour annuler
   reachable: Map<number, number>; // zone de déplacement, vide hors du mode 'move'
   menu: Menu | null;
-  targets: string[]; // ids des ennemis attaquables, en mode 'target'
+  targets: string[]; // ids des cibles possibles, en mode 'target'
+  targetKind: 'attack' | 'talk'; // ce qu'on choisit en mode 'target'
+  events: ScriptEvent[]; // le script du chapitre, pour savoir quelles conversations existent
 }
 
 // Ce que l'interface doit jouer à l'écran. L'état n'est pas encore modifié : c'est la lecture qui
 // le fait avancer (déplacement case par case, coup par coup), puis finishMove / finishAction conclut.
 export type Playback =
   | { type: 'move'; unitId: string; path: Pos[] }
-  | { type: 'combat'; events: CombatEvent[] };
+  | { type: 'combat'; events: CombatEvent[] }
+  | { type: 'talk'; unitId: string; partnerId: string };
 
-export function createUiState(): UiState {
-  return { cursor: { x: 0, y: 0 }, mode: 'idle', selectedId: null, origin: null, reachable: new Map(), menu: null, targets: [] };
+export function createUiState(events: ScriptEvent[] = []): UiState {
+  return {
+    cursor: { x: 0, y: 0 },
+    mode: 'idle',
+    selectedId: null,
+    origin: null,
+    reachable: new Map(),
+    menu: null,
+    targets: [],
+    targetKind: 'attack',
+    events,
+  };
 }
 
 export function menuItemAt(menu: Menu, pos: Pos): MenuItem | undefined {
@@ -63,8 +79,7 @@ export function confirm(state: GameState, ui: UiState, rng: Rng): Playback | nul
     case 'move':
       return confirmMove(state, ui);
     case 'menu':
-      confirmMenu(state, ui);
-      return null;
+      return confirmMenu(state, ui);
     case 'target':
       return confirmTarget(state, ui, rng);
     case 'system':
@@ -119,6 +134,7 @@ export function resetUi(ui: UiState): void {
   ui.reachable = new Map();
   ui.menu = null;
   ui.targets = [];
+  ui.targetKind = 'attack';
 }
 
 function selectedUnit(state: GameState, ui: UiState): Unit | undefined {
@@ -157,8 +173,12 @@ function openMenu(state: GameState, ui: UiState, items: MenuItem[], around: Pos)
 function openActionMenu(state: GameState, ui: UiState, unit: Unit): void {
   ui.mode = 'menu';
   ui.targets = [];
-  const canAttack = targetsInRange(state, unit).length > 0;
-  openMenu(state, ui, canAttack ? ['attack', 'wait'] : ['wait'], unit.pos);
+  ui.targetKind = 'attack';
+  const items: MenuItem[] = [];
+  if (targetsInRange(state, unit).length > 0) items.push('attack');
+  if (talkPartners(state, unit, ui.events).length > 0) items.push('talk');
+  items.push('wait');
+  openMenu(state, ui, items, unit.pos);
 }
 
 function confirmIdle(state: GameState, ui: UiState): void {
@@ -189,23 +209,40 @@ function confirmMove(state: GameState, ui: UiState): Playback | null {
   return null;
 }
 
-function confirmMenu(state: GameState, ui: UiState): void {
+function confirmMenu(state: GameState, ui: UiState): Playback | null {
   const unit = selectedUnit(state, ui);
   const item = clickedItem(ui);
-  if (unit === undefined) return;
+  if (unit === undefined) return null;
   if (item === 'wait') {
     finishAction(state, ui);
   } else if (item === 'attack') {
     ui.mode = 'target';
     ui.menu = null;
+    ui.targetKind = 'attack';
     ui.targets = targetsInRange(state, unit).map((target) => target.id);
+  } else if (item === 'talk') {
+    const partners = talkPartners(state, unit, ui.events);
+    const only = partners.length === 1 ? partners[0] : undefined;
+    if (only !== undefined) return startTalk(ui, unit, only); // un seul interlocuteur : pas besoin de le désigner
+    ui.mode = 'target';
+    ui.menu = null;
+    ui.targetKind = 'talk';
+    ui.targets = partners.map((partner) => partner.id);
   }
+  return null;
+}
+
+function startTalk(ui: UiState, unit: Unit, partner: Unit): Playback {
+  ui.mode = 'busy';
+  ui.menu = null;
+  return { type: 'talk', unitId: unit.id, partnerId: partner.id };
 }
 
 function confirmTarget(state: GameState, ui: UiState, rng: Rng): Playback | null {
   const unit = selectedUnit(state, ui);
   const target = unitAt(state, ui.cursor);
   if (unit === undefined || target === undefined || !ui.targets.includes(target.id)) return null;
+  if (ui.targetKind === 'talk') return startTalk(ui, unit, target);
   const events = resolveCombat(state, unit, target, rng);
   if (events.length === 0) return null;
   ui.mode = 'busy';

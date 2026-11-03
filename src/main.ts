@@ -17,7 +17,7 @@ import type { Choice, DialogueRunner, Line, StageStep } from './core/dialogue.ts
 import type { ScriptEvent, Trigger } from './core/script.ts';
 import { cancel, confirm, createUiState, finishAction, finishMove, resetUi, setCursor } from './core/selection.ts';
 import type { Playback } from './core/selection.ts';
-import { arrivalTriggers, attackTrigger, selectionTrigger } from './core/triggers.ts';
+import { arrivalTriggers, attackTrigger, selectionTrigger, talkTrigger } from './core/triggers.ts';
 import { endEnemyPhase } from './core/turn.ts';
 import type { Pos, Unit } from './core/types.ts';
 import { CHAPTER1_EVENTS } from './data/chapter1.events.ts';
@@ -67,7 +67,7 @@ const canvas = document.querySelector<HTMLCanvasElement>('#game');
 if (canvas === null) throw new Error('Canvas #game introuvable');
 
 const state = createChapter1();
-const ui = createUiState();
+const ui = createUiState(CHAPTER1_EVENTS);
 const fx: Effects = {
   flashId: null,
   popup: null,
@@ -553,6 +553,14 @@ function play(playback: Playback | null): void {
     const first = playback.events[0];
     if (first?.type === 'strike') playTriggers([attackTrigger(first.targetId)], fight);
     else fight();
+  } else if (playback?.type === 'talk') {
+    // La conversation termine l'action de l'unité, comme une attaque.
+    playTriggers([talkTrigger(playback.unitId, playback.partnerId)], () => {
+      finishAction(state, ui);
+      draw();
+      settleOutcome();
+      advance();
+    });
   }
 }
 

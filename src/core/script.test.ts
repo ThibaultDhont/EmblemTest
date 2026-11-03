@@ -64,16 +64,19 @@ test("les déclencheurs d'actions du joueur sont reconnus", () => {
       anna: x.3
     @event d quand case(marc,0,15)
       anna: x.4
+    @event e quand parler(anna,marc)
+      anna: x.5
   `);
   assert.deepEqual(
     events.map((event) => event.trigger),
-    ['selection(anna)', 'attaque(e2)', 'case(6,7)', 'case(marc,0,15)'],
+    ['selection(anna)', 'attaque(e2)', 'case(6,7)', 'case(marc,0,15)', 'parler(anna,marc)'],
   );
 });
 
 test('un déclencheur mal formé est refusé', () => {
   const invalid = ['jamais', 'tour.joueur(0)', 'tour.joueur(x)', 'tour.joueur', 'mort()', 'mort(Brutus)', 'tour.autre(1)'];
   invalid.push('selection()', 'attaque(Brutus)', 'case(1)', 'case(-1,2)', 'case(1,2,3)', 'case(a,b,c)', 'case(a,1)');
+  invalid.push('parler()', 'parler(anna)', 'parler(Anna,marc)', 'parler(anna,marc,x)', 'parler(anna,1)');
   for (const trigger of invalid) {
     assert.throws(() => parseScript(`@event a quand ${trigger}`), /Ligne 1 : .*déclencheur/, trigger);
   }

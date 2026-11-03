@@ -1,6 +1,6 @@
 import { SCREEN_HEIGHT, SCREEN_WIDTH, TILE_SIZE } from '../config.ts';
 import { tilesInRange } from '../core/combat.ts';
-import { posOf } from '../core/grid.ts';
+import { posOf, tileIndex } from '../core/grid.ts';
 import type { UiState } from '../core/selection.ts';
 import type { ClassId, GameState, Pos, TerrainId, Team, Unit } from '../core/types.ts';
 import { drawChoice, drawDialogue, drawHistory } from './dialogue.ts';
@@ -62,7 +62,12 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
       drawOverlay(ctx, state, ui.reachable.keys(), 'rgba(80, 160, 255, 0.5)');
       const selected = state.units.find((unit) => unit.id === ui.selectedId);
       if (ui.mode === 'target' && selected !== undefined) {
-        drawOverlay(ctx, state, tilesInRange(state, selected), 'rgba(230, 50, 50, 0.55)');
+        if (ui.targetKind === 'talk') {
+          const partners = state.units.filter((unit) => ui.targets.includes(unit.id));
+          drawOverlay(ctx, state, partners.map((unit) => tileIndex(state, unit.pos)), 'rgba(70, 200, 120, 0.55)');
+        } else {
+          drawOverlay(ctx, state, tilesInRange(state, selected), 'rgba(230, 50, 50, 0.55)');
+        }
       }
 
       for (const unit of state.units) drawUnit(ctx, unit, fx.flashId === unit.id);
@@ -80,7 +85,7 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
       drawHud(ctx, state);
       if (ui.mode === 'idle' || ui.mode === 'move') drawInfoPanel(ctx, state, ui);
       if (ui.menu !== null) drawMenu(ctx, ui, ui.menu);
-      if (ui.mode === 'target') drawForecast(ctx, state, ui);
+      if (ui.mode === 'target' && ui.targetKind === 'attack') drawForecast(ctx, state, ui);
       if (fx.showOutcome) drawOutcome(ctx, state);
     },
   };

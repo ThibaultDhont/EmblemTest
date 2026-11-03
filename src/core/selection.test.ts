@@ -4,6 +4,7 @@ import { applyEvent } from './combat.ts';
 import { stateFromRows, tileIndex } from './grid.ts';
 import { MENU_WIDTH, cancel, confirm, createUiState, finishAction, finishMove, setCursor } from './selection.ts';
 import type { MenuItem, Playback, UiState } from './selection.ts';
+import { parseScript } from './script.ts';
 import { makeUnit } from './test-helpers.ts';
 import type { GameState } from './types.ts';
 
@@ -220,6 +221,77 @@ test('hors de la phase joueur ou après la fin de partie, rien ne répond', () =
   state.outcome = 'defeat';
   assert.equal(click(state, ui, 0, 0), null);
   assert.equal(ui.mode, 'idle');
+});
+
+const TALKS = `
+  @event a quand parler(p1,p2)
+    p1: x.1
+  @event b quand parler(p1,e1)
+    p1: x.2`;
+
+// p1 en (1,1) avec deux voisins : p2 (alliée, dessous) et, si demandé, e1 (ennemi, à droite).
+function talkSetup(withEnemy = true) {
+  const state = stateFromRows(['........', '........', '........'], [
+    makeUnit({ id: 'p1', pos: { x: 1, y: 1 } }),
+    makeUnit({ id: 'p2', pos: { x: 1, y: 2 } }),
+    ...(withEnemy ? [makeUnit({ id: 'e1', team: 'enemy', pos: { x: 2, y: 1 } })] : []),
+  ]);
+  const ui = createUiState(parseScript(TALKS));
+  click(state, ui, 1, 1); // sélectionne p1
+  click(state, ui, 1, 1); // reste sur place : le menu d'actions s'ouvre
+  return { state, ui };
+}
+
+test('menu : Parler apparaît entre Attaquer et Attendre quand un interlocuteur est voisin', () => {
+  const { ui } = talkSetup();
+  assert.deepEqual(ui.menu?.items, ['attack', 'talk', 'wait']);
+});
+
+test("menu : pas de Parler sans voisin ayant un événement", () => {
+  const state = stateFromRows(['........'], [
+    makeUnit({ id: 'p1', pos: { x: 0, y: 0 } }),
+    makeUnit({ id: 'p2', pos: { x: 4, y: 0 } }), // pas voisin
+  ]);
+  const ui = createUiState(parseScript(TALKS));
+  click(state, ui, 0, 0);
+  click(state, ui, 0, 0);
+  assert.deepEqual(ui.menu?.items, ['wait']);
+});
+
+test("Parler avec plusieurs interlocuteurs : on désigne lequel, puis la conversation se lance", () => {
+  const { state, ui } = talkSetup();
+  assert.equal(clickItem(state, ui, 'talk'), null);
+  assert.equal(ui.mode, 'target');
+  assert.equal(ui.targetKind, 'talk');
+  assert.deepEqual(ui.targets, ['p2', 'e1']);
+
+  assert.equal(click(state, ui, 5, 2), null); // hors des interlocuteurs : rien
+  assert.deepEqual(click(state, ui, 1, 2), { type: 'talk', unitId: 'p1', partnerId: 'p2' });
+  assert.equal(ui.mode, 'busy');
+
+  finishAction(state, ui);
+  assert.equal(state.units[0]?.acted, true);
+  assert.equal(ui.mode, 'idle');
+});
+
+test('Parler avec un seul interlocuteur : la conversation se lance tout de suite', () => {
+  const { state, ui } = talkSetup(false);
+  assert.deepEqual(ui.menu?.items, ['talk', 'wait']);
+  assert.deepEqual(clickItem(state, ui, 'talk'), { type: 'talk', unitId: 'p1', partnerId: 'p2' });
+  assert.equal(ui.mode, 'busy');
+});
+
+test("annuler le choix de l'interlocuteur revient au menu ; une conversation jouée ne se propose plus", () => {
+  const { state, ui } = talkSetup();
+  clickItem(state, ui, 'talk');
+  cancel(state, ui);
+  assert.equal(ui.mode, 'menu');
+  assert.deepEqual(ui.menu?.items, ['attack', 'talk', 'wait']);
+
+  state.fired.push('a', 'b');
+  cancel(state, ui); // retour à la zone de déplacement
+  click(state, ui, 1, 1);
+  assert.deepEqual(ui.menu?.items, ['attack', 'wait']);
 });
 
 test('le curseur ignore une position hors de la carte', () => {

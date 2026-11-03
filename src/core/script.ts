@@ -6,7 +6,8 @@ export type Side = 'gauche' | 'droite';
 // `tour.ennemi(N)` : début de la phase ennemie ; `mort(id)` : l'unité `id` vient de tomber.
 // Actions du joueur : `selection(id)` : il sélectionne cette unité ; `attaque(id)` : il attaque cette unité
 // (avant le combat) ; `case(x,y)` : l'une de ses unités s'arrête sur cette case après un déplacement ;
-// `case(id,x,y)` : la même chose pour cette unité seulement.
+// `case(id,x,y)` : la même chose pour cette unité seulement ; `parler(a,b)` : l'unité `a` choisit « Parler »
+// à côté de l'unité `b`.
 export type Trigger =
   | 'chapitre.debut'
   | 'chapitre.victoire'
@@ -17,7 +18,8 @@ export type Trigger =
   | `selection(${string})`
   | `attaque(${string})`
   | `case(${number},${number})`
-  | `case(${string},${number},${number})`;
+  | `case(${string},${number},${number})`
+  | `parler(${string},${string})`;
 
 export type ComparisonOp = '==' | '>=' | '<=' | '>' | '<';
 
@@ -75,6 +77,7 @@ const TRIGGER = new RegExp(
       `(mort|selection|attaque)\\(${NAME}\\)`,
       'case\\([0-9]+,[0-9]+\\)',
       `case\\(${NAME},[0-9]+,[0-9]+\\)`,
+      `parler\\(${NAME},${NAME}\\)`,
     ].join('|') +
     ')$',
 );
@@ -119,7 +122,7 @@ export function parseScript(text: string): ScriptEvent[] {
           lineNumber,
           'syntaxe attendue « @event <nom> quand <déclencheur> », avec un déclencheur parmi : ' +
             'chapitre.debut, chapitre.victoire, chapitre.defaite, tour.joueur(N), tour.ennemi(N), mort(id), ' +
-            'selection(id), attaque(id), case(x,y), case(id,x,y)',
+            'selection(id), attaque(id), case(x,y), case(id,x,y), parler(id,id)',
         );
       }
       if (events.some((event) => event.id === id)) throw new ScriptError(lineNumber, `l'événement « ${id} » existe déjà`);

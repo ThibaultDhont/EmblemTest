@@ -93,6 +93,11 @@ test("les déclencheurs d'actions du joueur visent des unités et des cases prat
     const named = /^(?:selection|attaque)\((.+)\)$/.exec(trigger);
     if (named !== null) assert.ok(ids.has(named[1] ?? ''), `unité inconnue : ${trigger}`);
 
+    const talk = /^parler\(([a-z][a-z0-9-]*),([a-z][a-z0-9-]*)\)$/.exec(trigger);
+    if (talk !== null) {
+      for (const id of [talk[1], talk[2]]) assert.ok(ids.has(id ?? ''), `unité inconnue : ${trigger}`);
+    }
+
     const place = /^case\((?:([a-z][a-z0-9-]*),)?(\d+),(\d+)\)$/.exec(trigger);
     if (place === null) continue;
     if (place[1] !== undefined) assert.ok(ids.has(place[1]), `unité inconnue : ${trigger}`);

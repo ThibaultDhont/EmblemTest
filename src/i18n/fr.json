@@ -17,6 +17,7 @@
   "panel.hp": "PV {hp}/{max} · {weapon}",
   "panel.terrainBonus": "Déf +{def} Esq +{avoid}",
   "menu.attack": "Attaquer",
+  "menu.talk": "Parler",
   "menu.wait": "Attendre",
   "menu.endTurn": "Fin de tour",
   "forecast.hp": "PV",

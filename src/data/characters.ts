@@ -10,4 +10,5 @@ export const CHARACTERS: Record<string, CharacterDef> = {
   lise: { color: '#3fa05a', initial: 'L' },
   brutus: { color: '#7a4fa0', initial: 'B' },
   rik: { color: '#d08a2e', initial: 'R' },
+  gus: { color: '#8a6a3a', initial: 'G' },
 };
