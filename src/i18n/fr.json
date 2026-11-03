@@ -6,5 +6,21 @@
   "class.swordsman": "Épéiste",
   "class.lancer": "Lancier",
   "class.archer": "Archer",
-  "panel.unit": "{class} · Mvt {mov}"
+  "class.fighter": "Combattant",
+  "weapon.ironSword": "Épée de fer",
+  "weapon.ironLance": "Lance de fer",
+  "weapon.ironAxe": "Hache de fer",
+  "weapon.ironBow": "Arc de fer",
+  "panel.unit": "{class} · Mvt {mov}",
+  "panel.hp": "PV {hp}/{max} · {weapon}",
+  "panel.terrainBonus": "Déf +{def} Esq +{avoid}",
+  "menu.attack": "Attaquer",
+  "menu.wait": "Attendre",
+  "menu.endTurn": "Fin de tour",
+  "forecast.hp": "PV",
+  "forecast.damage": "Dégâts",
+  "forecast.hit": "Toucher",
+  "forecast.crit": "Crit",
+  "combat.miss": "Raté",
+  "hud.turn": "Tour {turn}"
 }

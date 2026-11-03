@@ -21,7 +21,7 @@ export function stateFromRows(rows: string[], units: Unit[]): GameState {
       tiles.push(terrain);
     }
   }
-  return { width, height: rows.length, tiles, units };
+  return { width, height: rows.length, tiles, units, turn: 1 };
 }
 
 export function inBounds(state: GameState, pos: Pos): boolean {
@@ -30,6 +30,10 @@ export function inBounds(state: GameState, pos: Pos): boolean {
 
 export function tileIndex(state: GameState, pos: Pos): number {
   return pos.y * state.width + pos.x;
+}
+
+export function distance(a: Pos, b: Pos): number {
+  return Math.abs(a.x - b.x) + Math.abs(a.y - b.y);
 }
 
 export function posOf(state: GameState, index: number): Pos {

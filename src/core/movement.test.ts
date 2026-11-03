@@ -2,10 +2,11 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { stateFromRows, tileIndex } from './grid.ts';
 import { reachableTiles } from './movement.ts';
+import { makeUnit } from './test-helpers.ts';
 import type { ClassId, GameState, Team, Unit } from './types.ts';
 
 function unit(id: string, team: Team, classId: ClassId, x: number, y: number): Unit {
-  return { id, team, classId, pos: { x, y } };
+  return makeUnit({ id, team, classId, pos: { x, y } });
 }
 
 // Coût d'arrivée sur la case (x, y), ou undefined si elle n'est pas atteignable.
