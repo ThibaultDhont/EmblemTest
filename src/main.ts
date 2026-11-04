@@ -16,7 +16,10 @@ import {
 } from './core/dialogue.ts';
 import type { Choice, DialogueRunner, Line, StageStep } from './core/dialogue.ts';
 import type { ScriptEvent, Trigger } from './core/script.ts';
-import { optionRowAt, titleButtonAt } from './core/screens.ts';
+import { SLOTS, createSave } from './core/save.ts';
+import type { LogEntry, Slot, SlotRead } from './core/save.ts';
+import { canPickSlot, confirmButtonAt, optionRowAt, slotRowAt, titleButtonAt } from './core/screens.ts';
+import type { SlotsMode } from './core/screens.ts';
 import { DEFAULT_SETTINGS, animationMs, cycleSetting, textStepMs } from './core/settings.ts';
 import type { SettingKey } from './core/settings.ts';
 import { updateOutcome } from './core/objective.ts';
@@ -35,17 +38,18 @@ import {
 import type { Playback } from './core/selection.ts';
 import { arrivalTriggers, attackTrigger, selectionTrigger, talkTrigger } from './core/triggers.ts';
 import { endEnemyPhase } from './core/turn.ts';
-import type { Pos, Unit } from './core/types.ts';
+import type { GameState, Pos, Unit } from './core/types.ts';
 import { CHAPTER1_EVENTS } from './data/chapter1.events.ts';
 import { createChapter1 } from './data/chapter1.ts';
 import { detectLanguage, setLanguage, storyText, t } from './i18n/index.ts';
+import type { MessageKey } from './i18n/index.ts';
 import type { Action } from './input/actions.ts';
 import { attachPointer } from './input/pointer.ts';
 import type { DialogueView } from './render/dialogue.ts';
 import { objectiveText } from './render/panels.ts';
 import { createRenderer } from './render/renderer.ts';
 import type { Effects } from './render/renderer.ts';
-import { loadSettings, saveSettings } from './storage.ts';
+import { loadSettings, readSlots, saveSettings, writeSlot } from './storage.ts';
 
 const MOVE_STEP_MS = 90;
 const COMBAT_STEP_MS = 600;
@@ -68,13 +72,6 @@ interface ActiveDialogue {
   done: () => void;
 }
 
-// Une réplique déjà vue, gardée pour l'historique (le texte est traduit à l'affichage).
-interface LogEntry {
-  eventId: string;
-  speaker: string;
-  key: string;
-}
-
 // Réglages du joueur : le choix enregistré d'abord, puis ?lang= et le navigateur pour la langue.
 let settings = loadSettings({ ...DEFAULT_SETTINGS, language: detectLanguage() });
 
@@ -92,8 +89,6 @@ if (canvas === null) throw new Error('Canvas #game introuvable');
 
 const state = createChapter1();
 const ui = createUiState(CHAPTER1_EVENTS);
-const lord = state.units.find((unit) => unit.role === 'lord');
-ui.camera = centerOn(state, lord?.pos ?? { x: 0, y: 0 });
 const fx: Effects = {
   flashId: null,
   popup: null,
@@ -110,16 +105,29 @@ let endHandled = false;
 let dialogue: ActiveDialogue | null = null;
 let autoMode = false; // gardé pendant la session, pas entre deux chargements de la page
 
-// Écran affiché : le titre au chargement, la partie, ou les options (ouvertes depuis l'un ou l'autre).
-let scene: 'title' | 'options' | 'game' = 'title';
+// Écran affiché : le titre au chargement, la partie, ou un écran ouvert depuis l'un ou l'autre (options, emplacements
+// de sauvegarde, confirmation).
+let scene: 'title' | 'options' | 'slots' | 'confirm' | 'game' = 'title';
 let optionsFrom: 'title' | 'game' = 'title';
+let slotsMode: SlotsMode = 'load';
+let slotsFrom: 'title' | 'game' = 'title';
+let slotsNotice: string | null = null; // message d'échec affiché sur l'écran des emplacements
+let slotReads: Record<Slot, SlotRead> = readSlots(); // relus à l'ouverture de l'écran des emplacements et du titre
+let confirmLines: string[] = [];
+let confirmYes: () => void = () => {};
+let confirmBack: 'slots' | 'game' = 'game';
 const log: LogEntry[] = [];
 const pendingDeaths: string[] = []; // unités tombées dont le dialogue de mort n'a pas encore été joué
 
+const canContinue = (): boolean => SLOTS.some((slot) => slotReads[slot].kind === 'ok');
+
 const draw = (): void => {
   if (scene === 'game') renderer.draw(state, ui, fx);
-  else if (scene === 'title') renderer.drawScreen({ kind: 'title', pointer: ui.pointer });
-  else renderer.drawScreen({ kind: 'options', pointer: ui.pointer, settings });
+  else if (scene === 'title') renderer.drawScreen({ kind: 'title', pointer: ui.pointer, canContinue: canContinue() });
+  else if (scene === 'options') renderer.drawScreen({ kind: 'options', pointer: ui.pointer, settings });
+  else if (scene === 'slots') {
+    renderer.drawScreen({ kind: 'slots', pointer: ui.pointer, mode: slotsMode, reads: slotReads, notice: slotsNotice });
+  } else renderer.drawScreen({ kind: 'confirm', pointer: ui.pointer, lines: confirmLines });
 };
 
 // La case de la carte visée suit le pointeur : elle change avec lui, et aussi quand la caméra bouge sous lui.
@@ -574,7 +582,7 @@ function playEnemies(): void {
       enemyPhaseRunning = false;
       draw();
       if (state.outcome !== 'playing') settleOutcome(); // objectif de survie atteint
-      else playTriggers([`tour.joueur(${state.turn})`], draw);
+      else playTriggers([`tour.joueur(${state.turn})`], startOfTurn);
       return;
     }
     const unit = state.units.find((other) => other.id === id);
@@ -651,7 +659,40 @@ function play(playback: Playback | null): void {
     });
   } else if (playback?.type === 'options') {
     openOptions('game');
+  } else if (playback?.type === 'save') {
+    openSlots('save', 'game');
+  } else if (playback?.type === 'title') {
+    askConfirm('confirm.title', 'confirm.titleDetail', goToTitle, 'game');
   }
+}
+
+// Repart d'un état de partie neuf ou chargé : tout ce que la partie précédente a laissé dans l'interface disparaît.
+function resetGame(fresh: GameState, history: LogEntry[]): void {
+  Object.assign(state, fresh);
+  resetUi(ui);
+  ui.cursor = { x: 0, y: 0 };
+  const lord = state.units.find((unit) => unit.role === 'lord');
+  ui.camera = centerOn(state, lord?.pos ?? { x: 0, y: 0 });
+  Object.assign(fx, { flashId: null, popup: null, dialogue: null, choice: null, history: null, showOutcome: false, staging: false, banner: null });
+  log.splice(0, log.length, ...history);
+  pendingDeaths.length = 0;
+  endHandled = false;
+  enemyPhaseRunning = false;
+  dialogue = null;
+}
+
+const makeSave = () => createSave('chapter1', state, log);
+
+// La partie en cours, dans l'emplacement automatique, à chaque début de tour du joueur : fermer l'onglet par mégarde
+// fait perdre au plus ce tour. Jamais une fois la partie gagnée ou perdue : « Continuer » reprend alors le dernier tour.
+function autosave(): void {
+  if (state.outcome === 'playing' && state.phase === 'player') writeSlot('auto', makeSave());
+}
+
+// Le tour du joueur commence, dialogues de début de tour joués.
+function startOfTurn(): void {
+  draw();
+  autosave();
 }
 
 function openOptions(from: 'title' | 'game'): void {
@@ -670,31 +711,99 @@ function changeSetting(key: SettingKey): void {
   if (key === 'language') applyLanguage();
 }
 
-function startChapter(): void {
-  scene = 'game';
-  draw();
-  playTriggers(['chapitre.debut'], () => playTriggers(['tour.joueur(1)'], () => showBanner('objective.title', draw)));
+function openSlots(mode: SlotsMode, from: 'title' | 'game'): void {
+  slotsMode = mode;
+  slotsFrom = from;
+  slotsNotice = null;
+  slotReads = readSlots();
+  scene = 'slots';
 }
 
-// Écrans titre et options : seuls le pointeur, la validation et l'annulation y répondent.
+function closeSlots(): void {
+  scene = slotsFrom;
+  if (scene === 'game') pointTo(ui.pointer);
+}
+
+function goToTitle(): void {
+  slotReads = readSlots();
+  scene = 'title';
+}
+
+function saveToSlot(slot: Slot): void {
+  slotsNotice = writeSlot(slot, makeSave()) ? null : t('slots.failed');
+  slotReads = readSlots();
+}
+
+function loadSlot(slot: Slot): void {
+  const read = slotReads[slot];
+  if (read.kind !== 'ok') return;
+  resetGame(structuredClone(read.save.state), structuredClone(read.save.log));
+  scene = 'game';
+}
+
+// Demande « sûr ? » avant une action qu'on ne défait pas ; Non, ou annuler, revient à `back`.
+function askConfirm(title: MessageKey, detail: MessageKey, yes: () => void, back: 'slots' | 'game'): void {
+  confirmLines = [t(title), t(detail)];
+  confirmYes = yes;
+  confirmBack = back;
+  scene = 'confirm';
+}
+
+function leaveConfirm(): void {
+  scene = confirmBack;
+  if (scene === 'game') pointTo(ui.pointer);
+}
+
+function startChapter(): void {
+  resetGame(createChapter1(), []);
+  scene = 'game';
+  draw();
+  playTriggers(['chapitre.debut'], () => playTriggers(['tour.joueur(1)'], () => showBanner('objective.title', startOfTurn)));
+}
+
+function confirmOnScreen(): void {
+  if (scene === 'title') {
+    const button = titleButtonAt(ui.pointer);
+    if (button === 'new') startChapter();
+    else if (button === 'continue' && canContinue()) openSlots('load', 'title');
+    else if (button === 'options') openOptions('title');
+  } else if (scene === 'options') {
+    const row = optionRowAt(ui.pointer);
+    if (row === 'back') closeOptions();
+    else if (row !== undefined) changeSetting(row);
+  } else if (scene === 'slots') {
+    const row = slotRowAt(ui.pointer);
+    if (row === 'back') {
+      closeSlots();
+    } else if (row !== undefined && canPickSlot(slotsMode, row, slotReads[row])) {
+      if (slotsMode === 'load') loadSlot(row);
+      else if (slotReads[row].kind === 'empty') saveToSlot(row);
+      else askConfirm('confirm.overwrite', 'confirm.overwriteDetail', () => saveToSlot(row), 'slots');
+    }
+  } else {
+    const button = confirmButtonAt(ui.pointer);
+    if (button === 'yes') {
+      scene = confirmBack; // « Oui » peut ouvrir un autre écran : on quitte d'abord celui-ci
+      confirmYes();
+    } else if (button === 'no') {
+      leaveConfirm();
+    }
+  }
+}
+
+// Écrans hors partie : seuls le pointeur, la validation et l'annulation y répondent.
 function handleScreenAction(action: Action): void {
   switch (action.type) {
     case 'pointer':
       ui.pointer = action.pos;
       break;
     case 'confirm':
-      if (scene === 'title') {
-        const button = titleButtonAt(ui.pointer);
-        if (button === 'new') startChapter();
-        else if (button === 'options') openOptions('title');
-      } else {
-        const row = optionRowAt(ui.pointer);
-        if (row === 'back') closeOptions();
-        else if (row !== undefined) changeSetting(row);
-      }
+      confirmOnScreen();
       break;
     case 'cancel':
       if (scene === 'options') closeOptions();
+      else if (scene === 'slots') closeSlots();
+      else if (scene === 'confirm') leaveConfirm();
       break;
     case 'scroll':
     case 'pan':

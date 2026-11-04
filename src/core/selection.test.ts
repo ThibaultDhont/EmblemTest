@@ -83,7 +83,7 @@ test('idle : une case vide ouvre le menu système', () => {
   const { state, ui } = setup();
   click(state, ui, 5, 2);
   assert.equal(ui.mode, 'system');
-  assert.deepEqual(ui.menu?.items, ['endTurn', 'options']);
+  assert.deepEqual(ui.menu?.items, ['endTurn', 'save', 'options', 'title']);
 });
 
 test("move : une case atteignable lance le déplacement, le menu s'ouvre à l'arrivée", () => {
@@ -368,4 +368,27 @@ test("système : Options ferme le menu et demande l'écran des options, sans fin
   assert.equal(ui.mode, 'idle');
   assert.equal(ui.menu, null);
   assert.equal(state.phase, 'player'); // le tour n'est pas fini
+});
+
+// Une carte assez haute pour le menu du système, qui compte quatre entrées.
+function tallSetup() {
+  const state = stateFromRows(Array.from({ length: 10 }, () => '........'), [makeUnit({ id: 'p1', pos: { x: 0, y: 0 } })]);
+  return { state, ui: createUiState() };
+}
+
+test("système : Sauvegarder et Titre ferment le menu et demandent leur écran, sans finir le tour", () => {
+  for (const item of ['save', 'title'] as const) {
+    const { state, ui } = tallSetup();
+    click(state, ui, 5, 2);
+    assert.deepEqual(clickItem(state, ui, item), { type: item });
+    assert.equal(ui.mode, 'idle');
+    assert.equal(ui.menu, null);
+    assert.equal(state.phase, 'player');
+  }
+});
+
+test('système : le menu à quatre entrées reste dans la carte, même près du bas', () => {
+  const { state, ui } = tallSetup();
+  click(state, ui, 5, 9);
+  assert.equal(ui.menu?.y, 6); // décalé vers le haut : 6 + 4 entrées = 10 rangées
 });

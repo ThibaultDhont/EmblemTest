@@ -9,7 +9,7 @@ import type { GameState, Pos, Unit } from './types.ts';
 
 export const MENU_WIDTH = 5; // en tuiles ; chaque entrée occupe une tuile de haut
 
-export type MenuItem = 'attack' | 'talk' | 'wait' | 'endTurn' | 'options';
+export type MenuItem = 'attack' | 'talk' | 'wait' | 'endTurn' | 'save' | 'options' | 'title';
 
 export interface Menu {
   items: MenuItem[];
@@ -39,12 +39,13 @@ export interface UiState {
 
 // Ce que l'interface doit jouer à l'écran. L'état n'est pas encore modifié : c'est la lecture qui
 // le fait avancer (déplacement case par case, coup par coup), puis finishMove / finishAction conclut.
-// `options` n'a rien à jouer : le joueur a choisi d'ouvrir l'écran des options.
+// `options`, `save` et `title` n'ont rien à jouer : le joueur a choisi, dans le menu d'une case vide, d'ouvrir un autre
+// écran (options, emplacements de sauvegarde) ou de quitter vers le titre.
 export type Playback =
   | { type: 'move'; unitId: string; path: Pos[] }
   | { type: 'combat'; events: CombatEvent[] }
   | { type: 'talk'; unitId: string; partnerId: string }
-  | { type: 'options' };
+  | { type: 'options' | 'save' | 'title' };
 
 export function createUiState(events: ScriptEvent[] = []): UiState {
   return {
@@ -202,7 +203,7 @@ function confirmIdle(state: GameState, ui: UiState): void {
   const target = unitAt(state, ui.cursor);
   if (target === undefined) {
     ui.mode = 'system';
-    openMenu(state, ui, ['endTurn', 'options'], ui.cursor);
+    openMenu(state, ui, ['endTurn', 'save', 'options', 'title'], ui.cursor);
   } else if (target.team === 'player' && !target.acted) {
     select(state, ui, target);
   }
@@ -270,5 +271,5 @@ function confirmSystem(state: GameState, ui: UiState): Playback | null {
   const item = clickedItem(ui);
   resetUi(ui);
   if (item === 'endTurn') endPlayerPhase(state);
-  return item === 'options' ? { type: 'options' } : null;
+  return item === 'options' || item === 'save' || item === 'title' ? { type: item } : null;
 }
