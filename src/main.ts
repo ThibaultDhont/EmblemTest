@@ -49,6 +49,7 @@ import type { DialogueView } from './render/dialogue.ts';
 import { objectiveText } from './render/panels.ts';
 import { createRenderer } from './render/renderer.ts';
 import type { Effects } from './render/renderer.ts';
+import { loadSprites } from './render/sprites.ts';
 import { loadSettings, readSlots, saveSettings, writeSlot } from './storage.ts';
 
 const MOVE_STEP_MS = 90;
@@ -99,7 +100,7 @@ const fx: Effects = {
   staging: false,
   banner: null,
 };
-const renderer = createRenderer(canvas);
+const renderer = createRenderer(canvas, await loadSprites());
 let enemyPhaseRunning = false;
 let endHandled = false;
 let dialogue: ActiveDialogue | null = null;

@@ -1,6 +1,6 @@
 # Cadrage du projet
 
-Document de référence des décisions de conception. Dernière mise à jour : 2026-11-03, après la revue complète des thèmes (jalons 1 à 3 et étapes 4a à 4i, 5a, 5b, 6a et 6b terminés).
+Document de référence des décisions de conception. Dernière mise à jour : 2026-11-04, après le choix de la direction d'univers et d'art (jalons 1 à 3 et étapes 4a à 4i, 5a, 5b, 6a et 6b terminés).
 
 Ce document remplace les choix précédents quand ils diffèrent (voir « Changements par rapport au départ »).
 
@@ -20,7 +20,7 @@ Ce document remplace les choix précédents quand ils diffèrent (voir « Change
 
 ## 3. Univers et récit
 
-- **Univers** : original, à définir ensemble (pas encore fixé).
+- **Univers** : original, post-apocalyptique et solarpunk. Une catastrophe a frappé l'ancien monde ; l'humanité vit plus en harmonie avec la nature et a reconstruit sur les bases des ruines. Restent à définir : la magie (technologie solaire, énergie du vivant ou absente), les montures et les unités volantes, les soigneurs, la part de technologie visible, le nom du jeu.
 - **Ton** : léger et humoristique.
 - **Structure** : plusieurs routes et plusieurs fins.
 - **Personnages** : 20 à 30 personnages jouables.
@@ -58,6 +58,8 @@ Ce document remplace les choix précédents quand ils diffèrent (voir « Change
 
 - **Résolution** : tuiles 16×16, écran logique 384×256 (24×16 tuiles), agrandissement entier.
 - **Production des assets** : génération par IA, retouchée à la main.
+- **Direction artistique** : l'univers de la section 3. Ruines de l'ancien monde reprises par la végétation, matériaux de récupération, technologie douce (solaire, éolien). Voir `docs/assets.md` pour la liste et les tailles.
+- **Palette et éditeur** : palette `palette_16bit_amelioree_64` (64 couleurs), les assets n'utilisent que ses couleurs. Éditeur : Pixelorama (libre). Les assets vivent dans `src/sprites/` ; les trois variantes de plaine sont faites.
 - **Combats** : écran de combat dédié par défaut, avec une option de combats rapides sur la carte.
 - **Son** : effets sonores, musique chiptune, voix ou cris courts. Dans un second temps.
 
@@ -104,10 +106,10 @@ Ce document remplace les choix précédents quand ils diffèrent (voir « Change
 
 ## Questions ouvertes
 
-- L'univers et le nom du jeu.
+- Le nom du jeu, et les détails de l'univers (magie, montures, unités volantes, soigneurs, technologie visible).
 - Le style de l'interface.
 - La méthode de création des cartes (texte, Tiled, éditeur maison).
-- La direction artistique précise et l'outil de génération d'images.
+- L'outil de génération d'images (la palette et l'éditeur sont choisis).
 - La disposition mobile en portrait.
 
 ## Ordre de jalons proposé
@@ -138,4 +140,4 @@ Ce document remplace les choix précédents quand ils diffèrent (voir « Change
 
 **Fait** : grille et déplacement avec coût de terrain, combat (triangle physique, double attaque, riposte selon la portée, critique, 2RN), mort définitive, phases joueur et ennemie, IA à trois profils, seigneur et boss avec écran de fin, objectifs de chapitre (boss, déroute, survie, atteindre une case, escorter) affichés dans le HUD, avec la case visée marquée sur la carte, et annoncés par une bannière, déplacements animés, i18n fr/en, script de dialogues (format texte, analyseur, interpréteur avec blocs @si et drapeaux), dialogues avec portraits provisoires et texte progressif (mode Auto, passer avec confirmation, historique, choix du joueur, mise en scène des unités), déclencheurs de début et de fin de chapitre, de début de tour, de mort d'une unité et d'actions du joueur (sélection, attaque, arrivée sur une case), commande « Parler » avec recrutement par la parole, caméra et défilement à la souris (bords de l'écran, molette) sur des cartes plus grandes que la vue, entrées tactiles (toucher, glisser, bouton « Retour »), écran titre et options enregistrées (vitesse du texte et des animations, langue), sauvegarde de partie (un emplacement automatique, trois manuels, « Continuer », retour au titre), tests.
 
-**Pas encore fait** : tout ce qui n'est pas listé ci-dessus, en particulier la narration entre les niveaux, l'export de sauvegarde, la progression, la magie, l'inventaire et les vrais assets.
+**Pas encore fait** : tout ce qui n'est pas listé ci-dessus, en particulier la narration entre les niveaux, l'export de sauvegarde, la progression, la magie, l'inventaire et les vrais assets (seules les tuiles de terrain sont branchées ; un terrain sans PNG dans `src/sprites/` garde son aplat provisoire).

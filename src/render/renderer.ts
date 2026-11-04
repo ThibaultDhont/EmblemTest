@@ -11,6 +11,7 @@ import { drawBackButton, drawBanner, drawForecast, drawHud, drawInfoPanel, drawM
 import type { Banner } from './panels.ts';
 import { drawScreen } from './screens.ts';
 import type { ScreenView } from './screens.ts';
+import type { Sprites } from './sprites.ts';
 
 // Effets ponctuels : lecture d'un combat, dialogue en cours, écran de fin.
 export interface Effects {
@@ -40,7 +41,7 @@ const CLASS_MARK: Record<ClassId, string> = {
   fighter: '#e08a3c',
 };
 
-export function createRenderer(canvas: HTMLCanvasElement): Renderer {
+export function createRenderer(canvas: HTMLCanvasElement, sprites: Sprites): Renderer {
   canvas.width = SCREEN_WIDTH;
   canvas.height = SCREEN_HEIGHT;
   const ctx = canvas.getContext('2d');
@@ -74,7 +75,7 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
 
       for (let index = 0; index < state.tiles.length; index++) {
         const pos = posOf(state, index);
-        drawTerrain(ctx, state.tiles[index] ?? 'plain', pos.x * TILE_SIZE, pos.y * TILE_SIZE);
+        drawTerrain(ctx, sprites, state.tiles[index] ?? 'plain', pos);
       }
 
       const goal = objectiveTarget(state.objective);
@@ -115,7 +116,15 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
   };
 }
 
-function drawTerrain(ctx: CanvasRenderingContext2D, terrain: TerrainId, x: number, y: number): void {
+// Une tuile dessinée remplace l'aplat provisoire du terrain, sans quadrillage : ce serait l'effacer.
+function drawTerrain(ctx: CanvasRenderingContext2D, sprites: Sprites, terrain: TerrainId, pos: Pos): void {
+  const x = pos.x * TILE_SIZE;
+  const y = pos.y * TILE_SIZE;
+  const sprite = sprites.terrain(terrain, pos.x, pos.y);
+  if (sprite !== undefined) {
+    ctx.drawImage(sprite, x, y, TILE_SIZE, TILE_SIZE);
+    return;
+  }
   switch (terrain) {
     case 'plain':
       ctx.fillStyle = '#7fbf5a';
