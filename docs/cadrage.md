@@ -1,6 +1,6 @@
 # Cadrage du projet
 
-Document de référence des décisions de conception. Dernière mise à jour : 2026-11-04, après le choix de la direction d'univers et d'art (jalons 1 à 3 et étapes 4a à 4i, 5a, 5b, 6a et 6b terminés).
+Document de référence des décisions de conception. Dernière mise à jour : 2026-11-11, après le test de style des assets générés par IA (jalons 1 à 3 et étapes 4a à 4i, 5a, 5b, 6a et 6b terminés).
 
 Ce document remplace les choix précédents quand ils diffèrent (voir « Changements par rapport au départ »).
 
@@ -57,9 +57,10 @@ Ce document remplace les choix précédents quand ils diffèrent (voir « Change
 ## 7. Art et son
 
 - **Résolution** : tuiles 16×16, écran logique 384×256 (24×16 tuiles), agrandissement entier.
-- **Production des assets** : génération par IA, retouchée à la main.
+- **Production des assets** (décision du 2026-11-11) : sprites d'unités sur la carte à la main, 12 images par unité (respiration au survol, marche vers le bas, le haut et de côté, 3 images chacune). Portraits et sprites de combat : ComfyUI, conditionné pour tenir le style, puis retouche à la main. Tuiles : à la main. Écartés : la réduction d'images IA en 16×16 (trop de perte) et les sprites par règles (`tools/sprite.ts`, animation bonne mais dessin insatisfaisant).
 - **Direction artistique** : l'univers de la section 3. Ruines de l'ancien monde reprises par la végétation, matériaux de récupération, technologie douce (solaire, éolien). Voir `docs/assets.md` pour la liste et les tailles.
-- **Palette et éditeur** : palette `palette_16bit_amelioree_64` (64 couleurs), les assets n'utilisent que ses couleurs. Éditeur : Pixelorama (libre). Les assets vivent dans `src/sprites/` ; les trois variantes de plaine sont faites.
+- **Palette et éditeur** : palette `palette_16bit_amelioree_64` (64 couleurs), les assets n'utilisent que ses couleurs. Éditeur : Pixelorama (libre). Les assets vivent dans `src/sprites/`. Faits à la main : plaine et forêt (3 variantes chacune). Test de style IA (2026-11-11) : montagne, mur, Anna sur la carte et son portrait. La palette est rangée dans `art/palette.gpl`. Verdict du test : formes reconnaissables, mais la réduction perd trop d'informations, à améliorer avant de produire en masse.
+- **Génération** : en local et gratuite. Par IA : ComfyUI + Z-Image Turbo + LoRA pixel art (Apache 2.0), puis réduction sur la palette par `tools/pixelize.ts`. Par règles : `tools/sprite.ts`, sans IA ni réduction (voir `CLAUDE.md`). Pas d'entraînement sur des assets d'autres jeux : une LoRA, s'il y en a une un jour, apprendra sur nos propres sprites.
 - **Combats** : écran de combat dédié par défaut, avec une option de combats rapides sur la carte.
 - **Son** : effets sonores, musique chiptune, voix ou cris courts. Dans un second temps.
 
@@ -109,7 +110,7 @@ Ce document remplace les choix précédents quand ils diffèrent (voir « Change
 - Le nom du jeu, et les détails de l'univers (magie, montures, unités volantes, soigneurs, technologie visible).
 - Le style de l'interface.
 - La méthode de création des cartes (texte, Tiled, éditeur maison).
-- L'outil de génération d'images (la palette et l'éditeur sont choisis).
+- L'outil de génération d'images : ComfyUI en local est en test, à confirmer après le test de style (la palette et l'éditeur sont choisis).
 - La disposition mobile en portrait.
 
 ## Ordre de jalons proposé
@@ -140,4 +141,4 @@ Ce document remplace les choix précédents quand ils diffèrent (voir « Change
 
 **Fait** : grille et déplacement avec coût de terrain, combat (triangle physique, double attaque, riposte selon la portée, critique, 2RN), mort définitive, phases joueur et ennemie, IA à trois profils, seigneur et boss avec écran de fin, objectifs de chapitre (boss, déroute, survie, atteindre une case, escorter) affichés dans le HUD, avec la case visée marquée sur la carte, et annoncés par une bannière, déplacements animés, i18n fr/en, script de dialogues (format texte, analyseur, interpréteur avec blocs @si et drapeaux), dialogues avec portraits provisoires et texte progressif (mode Auto, passer avec confirmation, historique, choix du joueur, mise en scène des unités), déclencheurs de début et de fin de chapitre, de début de tour, de mort d'une unité et d'actions du joueur (sélection, attaque, arrivée sur une case), commande « Parler » avec recrutement par la parole, caméra et défilement à la souris (bords de l'écran, molette) sur des cartes plus grandes que la vue, entrées tactiles (toucher, glisser, bouton « Retour »), écran titre et options enregistrées (vitesse du texte et des animations, langue), sauvegarde de partie (un emplacement automatique, trois manuels, « Continuer », retour au titre), tests.
 
-**Pas encore fait** : tout ce qui n'est pas listé ci-dessus, en particulier la narration entre les niveaux, l'export de sauvegarde, la progression, la magie, l'inventaire et les vrais assets (seules les tuiles de terrain sont branchées ; un terrain sans PNG dans `src/sprites/` garde son aplat provisoire).
+**Pas encore fait** : tout ce qui n'est pas listé ci-dessus, en particulier la narration entre les niveaux, l'export de sauvegarde, la progression, la magie, l'inventaire et les vrais assets. Sont branchés : les tuiles de terrain, l'image de repos des unités et les portraits (un élément sans PNG dans `src/sprites/` garde son dessin provisoire). Pas encore : animations, yeux et bouche des portraits, couleurs d'équipe, interface et police.
