@@ -1,0 +1,36 @@
+GIMP Palette
+Name: zones des gabarits (tools/sprite.ts)
+Columns: 4
+#
+255 192 224	peau clair
+255 128 192	peau moyen
+192  64 128	peau ombre
+ 96  16  64	peau trait
+255 255 128	cheveux clair
+224 224   0	cheveux moyen
+160 160   0	cheveux ombre
+ 80  80   0	cheveux trait
+160 192 255	tenue clair
+ 64 128 255	tenue moyen
+ 32  64 192	tenue ombre
+ 16  32  96	tenue trait
+160 255 160	tenue2 clair
+ 64 224  64	tenue2 moyen
+ 32 160  32	tenue2 ombre
+ 16  80  16	tenue2 trait
+192 255 255	metal clair
+ 64 224 224	metal moyen
+ 32 160 160	metal ombre
+ 16  80  80	metal trait
+255 208 160	cuir clair
+255 144  64	cuir moyen
+192  96  16	cuir ombre
+ 96  48   8	cuir trait
+224 176 255	accent clair
+176  96 255	accent moyen
+112  32 192	accent ombre
+ 56  12  96	accent trait
+255 160 160	yeux clair
+255  48  48	yeux moyen
+176  16  16	yeux ombre
+ 80   8   8	yeux trait

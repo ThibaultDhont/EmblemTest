@@ -1,0 +1,26 @@
+{
+  "anna": {
+    "portrait": "a cheerful confident young woman, about twenty, short messy red-brown bob hair, brown eyes, bright determined smile, teal scarf wrapped around her neck, red patchwork jacket",
+    "combat": "a cheerful young woman swordfighter, short messy red-brown bob hair, teal scarf, red patchwork jacket, dark blue trousers, brown boots, holding a sword with a blade cut from a steel spring and a copper pipe guard"
+  },
+  "marc": {
+    "portrait": "a laid-back young man, about twenty-two, short spiky dark brown hair, easy relaxed smile, blue padded vest of patched canvas over a cream shirt, a dented tin mug hanging from the strap on his shoulder",
+    "combat": "a laid-back young man lancer, short spiky dark brown hair, blue padded vest of patched canvas over a cream shirt, grey trousers, sturdy boots, a dented tin mug on his belt, holding a long spear made from a steel pipe with a sharpened blade tip"
+  },
+  "lise": {
+    "portrait": "a calm young woman archer, about nineteen, long blonde braid over her shoulder, freckles, half-lidded deadpan look, green hooded cloak of patched canvas, leather quiver strap across her chest",
+    "combat": "a calm young woman archer, long blonde braid, green hooded cloak of patched canvas, brown leggings, soft boots, drawing a bow made from a cut ski, arrows in a quiver made from a plastic tube"
+  },
+  "brutus": {
+    "portrait": "a burly overconfident bandit chief, about forty, thick black beard, purple bandana, smug grin, one big shoulder pad of dented yellow metal plates, dark leather vest",
+    "combat": "a burly bandit chief, thick black beard, purple bandana, one big shoulder pad of dented yellow metal plates, dark leather vest, purple sash, dark trousers, heavy boots, holding a heavy two-handed axe with a thick blade of dented yellow metal"
+  },
+  "rik": {
+    "portrait": "a cocky young mercenary man, about twenty-five, thin face, messy black hair tied in a small ponytail, sly smirk, aviator goggles pushed up on his forehead, orange patched jacket with many pockets, a coin hanging on a string around his neck",
+    "combat": "a cocky young mercenary archer, messy black hair in a small ponytail, aviator goggles on his forehead, orange patched jacket with many pockets, grey cargo trousers, holding a short bow made from a bent metal spring"
+  },
+  "gus": {
+    "portrait": "a grumpy sulking man, about thirty, round chubby face, droopy brown moustache, a dented cooking pot worn as a helmet, brown patched coat with a sheepskin collar, sulky frown",
+    "combat": "a grumpy chubby man lancer, droopy brown moustache, a dented cooking pot worn as a helmet, brown patched coat with a sheepskin collar, holding a spear made from a wooden pole with a garden shear blade"
+  }
+}

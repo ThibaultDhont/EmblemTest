@@ -1,0 +1,21 @@
+{
+  "taille": 16,
+  "lignes": { "cou": 7, "taille": 13, "milieu": 7 },
+  "materiaux": {
+    "peau": ["#ffe3b5", "#f7c384", "#efa284", "#9c615a"],
+    "roux": "#d85a36",
+    "creme": "#d6cfc8",
+    "ciel": "#39a2de",
+    "marine": "#285778",
+    "cuir": "#845942",
+    "acier": ["#f7f3f7", "#d6cfc8", "#7b797b", "#354052"],
+    "nuit": "#20283a"
+  },
+  "defaut": { "peau": "peau", "yeux": "nuit", "metal": "acier", "cuir": "cuir" },
+  "unites": {
+    "anna": {
+      "pieces": ["corps", "tenue_aventuriere", "echarpe", "cheveux_carre", { "nom": "epee", "suit": "torse" }],
+      "couleurs": { "cheveux": "roux", "tenue": "creme", "tenue2": "marine", "accent": "ciel" }
+    }
+  }
+}
