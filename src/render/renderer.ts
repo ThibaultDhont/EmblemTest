@@ -92,7 +92,7 @@ export function createRenderer(canvas: HTMLCanvasElement, sprites: Sprites): Ren
         }
       }
 
-      for (const unit of state.units) drawUnit(ctx, unit, fx.flashId === unit.id);
+      for (const unit of state.units) drawUnit(ctx, sprites, unit, fx.flashId === unit.id);
       if (!fx.staging) drawCursor(ctx, ui);
       drawPopup(ctx, fx, ui.camera);
       ctx.restore();
@@ -101,7 +101,7 @@ export function createRenderer(canvas: HTMLCanvasElement, sprites: Sprites): Ren
       if (fx.staging) return;
 
       if (fx.dialogue !== null) {
-        drawDialogue(ctx, fx.dialogue, ui.pointer);
+        drawDialogue(ctx, fx.dialogue, ui.pointer, sprites);
         if (fx.choice !== null) drawChoice(ctx, fx.choice, fx.dialogue, ui.pointer);
         if (fx.history !== null) drawHistory(ctx, fx.history);
         return;
@@ -194,27 +194,35 @@ function drawOverlay(ctx: CanvasRenderingContext2D, state: GameState, indices: I
   }
 }
 
-function drawUnit(ctx: CanvasRenderingContext2D, unit: Unit, flashing: boolean): void {
+function drawUnit(ctx: CanvasRenderingContext2D, sprites: Sprites, unit: Unit, flashing: boolean): void {
   const x = unit.pos.x * TILE_SIZE;
   const y = unit.pos.y * TILE_SIZE;
-  // Bordure dorée pour le seigneur, violette pour le boss.
-  ctx.fillStyle = unit.role === 'lord' ? '#f2d04b' : unit.role === 'boss' ? '#b04bd0' : '#101010';
-  ctx.fillRect(x + 1, y + 1, 14, 11);
-  ctx.fillStyle = TEAM_COLOR[unit.team];
-  ctx.fillRect(x + 2, y + 2, 12, 9);
-  ctx.fillStyle = CLASS_MARK[unit.classId];
-  ctx.fillRect(x + 6, y + 4, 4, 4);
-  if (unit.acted) {
-    ctx.fillStyle = 'rgba(90, 90, 90, 0.65)';
+  const sprite = sprites.unit(unit);
+  if (sprite !== undefined) {
+    // Première image de la feuille (repos, en haut à gauche), grisée une fois que l'unité a agi.
+    ctx.drawImage(unit.acted ? sprite.dimmed : sprite.normal, 0, 0, TILE_SIZE, TILE_SIZE, x, y, TILE_SIZE, TILE_SIZE);
+  } else {
+    // Bordure dorée pour le seigneur, violette pour le boss.
+    ctx.fillStyle = unit.role === 'lord' ? '#f2d04b' : unit.role === 'boss' ? '#b04bd0' : '#101010';
+    ctx.fillRect(x + 1, y + 1, 14, 11);
+    ctx.fillStyle = TEAM_COLOR[unit.team];
     ctx.fillRect(x + 2, y + 2, 12, 9);
+    ctx.fillStyle = CLASS_MARK[unit.classId];
+    ctx.fillRect(x + 6, y + 4, 4, 4);
+    if (unit.acted) {
+      ctx.fillStyle = 'rgba(90, 90, 90, 0.65)';
+      ctx.fillRect(x + 2, y + 2, 12, 9);
+    }
   }
 
-  // Barre de PV : verte, puis jaune sous 50 %, rouge sous 25 %.
+  // Barre de PV : verte, puis jaune sous 50 %, rouge sous 25 %. Sous un sprite, elle se fait plus fine
+  // (2 lignes au lieu de 3) pour cacher le moins possible des pieds.
   const ratio = unit.hp / unit.stats.maxHp;
+  const barY = sprite === undefined ? y + 12 : y + 14;
   ctx.fillStyle = '#101010';
-  ctx.fillRect(x + 1, y + 12, 14, 3);
+  ctx.fillRect(x + 1, barY, 14, sprite === undefined ? 3 : 2);
   ctx.fillStyle = ratio > 0.5 ? '#4cd04c' : ratio > 0.25 ? '#e0c030' : '#e04040';
-  ctx.fillRect(x + 2, y + 13, Math.max(unit.hp > 0 ? 1 : 0, Math.round(12 * ratio)), 1);
+  ctx.fillRect(x + 2, barY + (sprite === undefined ? 1 : 0), Math.max(unit.hp > 0 ? 1 : 0, Math.round(12 * ratio)), 1);
 
   if (flashing) {
     ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';

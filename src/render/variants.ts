@@ -14,6 +14,18 @@ export function parseTileFile(path: string): { terrain: TerrainId; variant: numb
   return { terrain, variant: Number(variant) };
 }
 
+const NAMED_FILE = /(?:^|\/)(unit|portrait)_([a-z][a-z0-9]*)\.png$/;
+
+// Sprite d'unité unit_<id>.png (id d'une unité, ou de sa classe pour toutes les unités de cette classe)
+// et portrait portrait_<personnage>.png ; tout autre fichier est ignoré.
+export function parseNamedFile(path: string): { kind: 'unit' | 'portrait'; id: string } | undefined {
+  const match = NAMED_FILE.exec(path);
+  const kind = match?.[1];
+  const id = match?.[2];
+  if ((kind !== 'unit' && kind !== 'portrait') || id === undefined) return undefined;
+  return { kind, id };
+}
+
 // Variante d'une case : toujours la même pour une position donnée, sans état ni hasard, et sans motif visible.
 export function pickVariant(x: number, y: number, count: number): number {
   if (count <= 1) return 0;

@@ -8,10 +8,13 @@ import {
   dialogueButtonAt,
 } from '../core/dialogue.ts';
 import type { Portrait } from '../core/dialogue.ts';
+import type { Side } from '../core/script.ts';
 import type { Pos } from '../core/types.ts';
 import { CHARACTERS } from '../data/characters.ts';
 import { t } from '../i18n/index.ts';
 import { drawBox, setText } from './panels.ts';
+import { PORTRAIT_SIZE } from './sprites.ts';
+import type { Sprites } from './sprites.ts';
 
 // Ce qu'il faut afficher d'une réplique à un instant donné.
 export interface DialogueView {
@@ -42,14 +45,29 @@ export interface HistoryView {
 }
 
 const BOX = { x: 8, y: SCREEN_HEIGHT - 72, width: SCREEN_WIDTH - 16, height: 64 };
-const PORTRAIT = { width: 56, height: 64, gap: 4 };
+const PORTRAIT = { width: PORTRAIT_SIZE, height: PORTRAIT_SIZE, gap: 4 };
 const LINE_HEIGHT = 11;
 const MAX_LINES = 4;
 const HISTORY_VISIBLE_LINES = Math.floor((HISTORY_BOX.height * TILE_SIZE - 16) / LINE_HEIGHT);
 
-// Placeholders : un aplat de couleur et l'initiale du personnage.
-function drawPortrait(ctx: CanvasRenderingContext2D, who: string, x: number, active: boolean): void {
+// Portrait dessiné (tourné vers la droite, retourné du côté droit pour regarder vers le centre), sans cadre,
+// assombri quand le personnage ne parle pas. Sinon, le provisoire : un aplat de couleur et l'initiale.
+function drawPortrait(ctx: CanvasRenderingContext2D, sprites: Sprites, who: string, x: number, active: boolean, side: Side): void {
   const y = BOX.y - PORTRAIT.height - 4;
+  const sprite = sprites.portrait(who);
+  if (sprite !== undefined) {
+    ctx.save();
+    if (side === 'droite') {
+      ctx.translate(x + PORTRAIT.width, y);
+      ctx.scale(-1, 1);
+    } else {
+      ctx.translate(x, y);
+    }
+    ctx.drawImage(active ? sprite.normal : sprite.dimmed, 0, 0);
+    ctx.restore();
+    return;
+  }
+
   const character = CHARACTERS[who];
   ctx.fillStyle = active ? '#ffe14d' : '#e8e8f0';
   ctx.fillRect(x - 1, y - 1, PORTRAIT.width + 2, PORTRAIT.height + 2);
@@ -115,13 +133,22 @@ function drawButtons(ctx: CanvasRenderingContext2D, view: DialogueView, cursor: 
   }
 }
 
-export function drawDialogue(ctx: CanvasRenderingContext2D, view: DialogueView, cursor: Pos): void {
+export function drawDialogue(ctx: CanvasRenderingContext2D, view: DialogueView, cursor: Pos, sprites: Sprites): void {
   const left = view.cast.filter((portrait) => portrait.side === 'gauche');
   const right = view.cast.filter((portrait) => portrait.side === 'droite');
   const step = PORTRAIT.width + PORTRAIT.gap;
-  left.forEach((portrait, index) => drawPortrait(ctx, portrait.who, BOX.x + index * step, portrait.who === view.speaker));
+  left.forEach((portrait, index) =>
+    drawPortrait(ctx, sprites, portrait.who, BOX.x + index * step, portrait.who === view.speaker, 'gauche'),
+  );
   right.forEach((portrait, index) =>
-    drawPortrait(ctx, portrait.who, SCREEN_WIDTH - BOX.x - PORTRAIT.width - index * step, portrait.who === view.speaker),
+    drawPortrait(
+      ctx,
+      sprites,
+      portrait.who,
+      SCREEN_WIDTH - BOX.x - PORTRAIT.width - index * step,
+      portrait.who === view.speaker,
+      'droite',
+    ),
   );
 
   drawBox(ctx, BOX.x, BOX.y, BOX.width, BOX.height);

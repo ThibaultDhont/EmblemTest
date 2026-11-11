@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { parseTileFile, pickVariant } from './variants.ts';
+import { parseNamedFile, parseTileFile, pickVariant } from './variants.ts';
 
 test('un nom de tuile donne le terrain et le numéro de variante', () => {
   assert.deepEqual(parseTileFile('tile_plain_1.png'), { terrain: 'plain', variant: 1 });
@@ -15,6 +15,16 @@ test('les autres fichiers sont ignorés', () => {
   assert.equal(parseTileFile('tile_plain_.png'), undefined);
   assert.equal(parseTileFile('tile_plain_1.png.bak'), undefined);
   assert.equal(parseTileFile('tile_plain_(Calque 1) _0001.png'), undefined);
+});
+
+test('un sprite d\'unité ou un portrait donne son identifiant', () => {
+  assert.deepEqual(parseNamedFile('../sprites/unit_anna.png'), { kind: 'unit', id: 'anna' });
+  assert.deepEqual(parseNamedFile('unit_swordsman.png'), { kind: 'unit', id: 'swordsman' });
+  assert.deepEqual(parseNamedFile('/src/sprites/portrait_marc.png'), { kind: 'portrait', id: 'marc' });
+  assert.equal(parseNamedFile('tile_plain_1.png'), undefined);
+  assert.equal(parseNamedFile('unit_.png'), undefined);
+  assert.equal(parseNamedFile('portrait_anna.apercu.png'), undefined);
+  assert.equal(parseNamedFile('xunit_anna.png'), undefined);
 });
 
 test('la variante d\'une case est stable et reste dans les bornes', () => {
